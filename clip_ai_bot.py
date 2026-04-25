@@ -1,6 +1,9 @@
 import os
 import re
+import shutil
+import subprocess
 import urllib.parse
+from pathlib import Path
 from typing import Any, Dict, List
 
 import requests
@@ -13,6 +16,7 @@ CORS(app)
 TARGET_SEGMENT_SECONDS = 25
 MIN_SEGMENT_SECONDS = 20
 MAX_SEGMENT_SECONDS = 30
+CLIP_OUTPUT_DIR = Path(os.getenv("CLIP_OUTPUT_DIR", "rendered_uploads/clips"))
 
 STOP_WORDS = {
     "the", "and", "for", "with", "that", "this", "from", "into", "about", "after",
@@ -80,17 +84,17 @@ def safe_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def safe_slug(value: str) -> str:
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", clean(value).lower()).strip("-")
+    return slug[:80] or "clip"
+
+
 def clip_text(clip: Dict[str, Any]) -> str:
     fields = ["title", "tags", "creator", "credit", "source", "pageUrl"]
     return clean(" ".join(str(clip.get(k, "")) for k in fields)).lower()
 
 
 def choose_iconic_segment(clip: Dict[str, Any], subject: str, scene: str) -> Dict[str, Any]:
-    """Pick a 20 to 30 second segment instead of using an entire long source video.
-
-    This is a safe heuristic. It cannot truly watch the video without computer vision,
-    but it chooses a strong short window and marks the clip for trimming.
-    """
     duration = safe_float(clip.get("duration"), 0.0)
     text = clip_text(clip)
     scene_tokens = set(tokens(scene, 12))
@@ -126,6 +130,59 @@ def choose_iconic_segment(clip: Dict[str, Any], subject: str, scene: str) -> Dic
     clip["needsTrim"] = bool(duration and duration > MAX_SEGMENT_SECONDS)
     clip["iconicScore"] = iconic_hits
     return clip
+
+
+def build_ffmpeg_trim_command(video_url: str, output_path: Path, start: float, duration: float) -> List[str]:
+    duration = max(1.0, min(float(duration), MAX_SEGMENT_SECONDS))
+    start = max(0.0, float(start))
+    return [
+        "ffmpeg",
+        "-y",
+        "-ss",
+        f"{start:.2f}",
+        "-i",
+        video_url,
+        "-t",
+        f"{duration:.2f}",
+        "-vf",
+        "scale=720:1280:force_original_aspect_ratio=increase,crop=720:1280",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "23",
+        "-c:a",
+        "aac",
+        "-b:a",
+        "128k",
+        "-movflags",
+        "+faststart",
+        str(output_path),
+    ]
+
+
+def trim_clip_with_ffmpeg(clip: Dict[str, Any], subject: str = "", scene: str = "") -> Dict[str, Any]:
+    if not shutil.which("ffmpeg"):
+        return {"ok": False, "error": "ffmpeg is not installed on this computer."}
+    clip = choose_iconic_segment(dict(clip), subject, scene)
+    video_url = clean(clip.get("videoUrl"))
+    if not video_url:
+        return {"ok": False, "error": "clip has no videoUrl."}
+    CLIP_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output = CLIP_OUTPUT_DIR / f"{safe_slug(clip.get('title') or clip.get('id') or subject)}-{int(clip['startTime'])}-{int(clip['clipDuration'])}.mp4"
+    command = build_ffmpeg_trim_command(video_url, output, clip["startTime"], clip["clipDuration"])
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=300)
+    return {
+        "ok": completed.returncode == 0,
+        "outputPath": str(output),
+        "startTime": clip["startTime"],
+        "endTime": clip["endTime"],
+        "clipDuration": clip["clipDuration"],
+        "segmentReason": clip["segmentReason"],
+        "command": command,
+        "stderr": completed.stderr[-3000:],
+    }
 
 
 def wiki_summary(subject: str) -> Dict[str, str]:
@@ -234,15 +291,7 @@ def search_pixabay(query: str, api_key: str, pages: int = 1) -> List[Dict[str, A
         try:
             response = requests.get(
                 "https://pixabay.com/api/videos/",
-                params={
-                    "key": api_key,
-                    "q": query,
-                    "orientation": "vertical",
-                    "per_page": 200 if pages > 1 else 40,
-                    "page": page,
-                    "safesearch": "true",
-                    "order": "popular",
-                },
+                params={"key": api_key, "q": query, "orientation": "vertical", "per_page": 200 if pages > 1 else 40, "page": page, "safesearch": "true", "order": "popular"},
                 timeout=10,
             )
             if not response.ok:
@@ -252,18 +301,7 @@ def search_pixabay(query: str, api_key: str, pages: int = 1) -> List[Dict[str, A
                 file = videos.get("medium") or videos.get("small") or videos.get("large") or videos.get("tiny")
                 if not file or not file.get("url"):
                     continue
-                clips.append({
-                    "id": f"pixabay-{hit.get('id')}",
-                    "source": "Pixabay",
-                    "title": hit.get("tags") or query,
-                    "tags": hit.get("tags") or query,
-                    "creator": hit.get("user") or "Pixabay creator",
-                    "pageUrl": hit.get("pageURL"),
-                    "videoUrl": file.get("url"),
-                    "previewUrl": file.get("url"),
-                    "duration": hit.get("duration") or 0,
-                    "license": "Pixabay Content License",
-                })
+                clips.append({"id": f"pixabay-{hit.get('id')}", "source": "Pixabay", "title": hit.get("tags") or query, "tags": hit.get("tags") or query, "creator": hit.get("user") or "Pixabay creator", "pageUrl": hit.get("pageURL"), "videoUrl": file.get("url"), "previewUrl": file.get("url"), "duration": hit.get("duration") or 0, "license": "Pixabay Content License"})
         except Exception:
             continue
     return clips
@@ -275,12 +313,7 @@ def search_pexels(query: str, api_key: str, pages: int = 1) -> List[Dict[str, An
     clips = []
     for page in range(1, pages + 1):
         try:
-            response = requests.get(
-                "https://api.pexels.com/videos/search",
-                params={"query": query, "orientation": "portrait", "size": "medium", "per_page": 80 if pages > 1 else 40, "page": page},
-                headers={"Authorization": api_key},
-                timeout=10,
-            )
+            response = requests.get("https://api.pexels.com/videos/search", params={"query": query, "orientation": "portrait", "size": "medium", "per_page": 80 if pages > 1 else 40, "page": page}, headers={"Authorization": api_key}, timeout=10)
             if not response.ok:
                 continue
             for video in response.json().get("videos", []):
@@ -289,18 +322,7 @@ def search_pexels(query: str, api_key: str, pages: int = 1) -> List[Dict[str, An
                 file = (vertical or files or [{}])[0]
                 if not file.get("link"):
                     continue
-                clips.append({
-                    "id": f"pexels-{video.get('id')}",
-                    "source": "Pexels",
-                    "title": query,
-                    "tags": query,
-                    "creator": (video.get("user") or {}).get("name") or "Pexels creator",
-                    "pageUrl": video.get("url"),
-                    "videoUrl": file.get("link"),
-                    "previewUrl": file.get("link"),
-                    "duration": video.get("duration") or 0,
-                    "license": "Pexels License",
-                })
+                clips.append({"id": f"pexels-{video.get('id')}", "source": "Pexels", "title": query, "tags": query, "creator": (video.get("user") or {}).get("name") or "Pexels creator", "pageUrl": video.get("url"), "videoUrl": file.get("link"), "previewUrl": file.get("link"), "duration": video.get("duration") or 0, "license": "Pexels License"})
         except Exception:
             continue
     return clips
@@ -311,22 +333,7 @@ def search_commons(query: str, pages: int = 1) -> List[Dict[str, Any]]:
     offset = 0
     for _ in range(pages):
         try:
-            response = requests.get(
-                "https://commons.wikimedia.org/w/api.php",
-                params={
-                    "action": "query",
-                    "generator": "search",
-                    "gsrnamespace": 6,
-                    "gsrlimit": 50,
-                    "gsroffset": offset,
-                    "gsrsearch": f"{query} filetype:video",
-                    "prop": "imageinfo",
-                    "iiprop": "url|mime|extmetadata",
-                    "format": "json",
-                    "origin": "*",
-                },
-                timeout=10,
-            )
+            response = requests.get("https://commons.wikimedia.org/w/api.php", params={"action": "query", "generator": "search", "gsrnamespace": 6, "gsrlimit": 50, "gsroffset": offset, "gsrsearch": f"{query} filetype:video", "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "format": "json", "origin": "*"}, timeout=10)
             if not response.ok:
                 break
             data = response.json()
@@ -339,18 +346,7 @@ def search_commons(query: str, pages: int = 1) -> List[Dict[str, Any]]:
                 artist = clean((meta.get("Artist") or {}).get("value") or "Wikimedia contributor")
                 artist = re.sub(r"<[^>]+>", "", artist)
                 media_title = clean(page.get("title") or "").replace("File:", ""))
-                clips.append({
-                    "id": f"commons-{page.get('pageid')}",
-                    "source": "Wikimedia Commons",
-                    "title": media_title,
-                    "tags": f"{media_title} {query}",
-                    "creator": artist,
-                    "pageUrl": "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(clean(page.get("title") or "").replace(" ", "_")),
-                    "videoUrl": info.get("url"),
-                    "previewUrl": info.get("url"),
-                    "duration": 0,
-                    "license": license_name,
-                })
+                clips.append({"id": f"commons-{page.get('pageid')}", "source": "Wikimedia Commons", "title": media_title, "tags": f"{media_title} {query}", "creator": artist, "pageUrl": "https://commons.wikimedia.org/wiki/" + urllib.parse.quote(clean(page.get("title") or "").replace(" ", "_")), "videoUrl": info.get("url"), "previewUrl": info.get("url"), "duration": 0, "license": license_name})
             offset = data.get("continue", {}).get("gsroffset")
             if not offset:
                 break
@@ -389,20 +385,12 @@ def strict_search(subject: str, fact: str, scene: str, pixabay_key: str, pexels_
 
     clips = list(by_id.values())
     clips.sort(key=lambda c: score_clip(c, subject, scene), reverse=True)
-    return {
-        "queries": queries,
-        "exactCount": len([c for c in clips if c.get("match") == "exact"]),
-        "relatedCount": len([c for c in clips if c.get("match") == "related"]),
-        "targetSegmentSeconds": TARGET_SEGMENT_SECONDS,
-        "minSegmentSeconds": MIN_SEGMENT_SECONDS,
-        "maxSegmentSeconds": MAX_SEGMENT_SECONDS,
-        "clips": clips[:1500],
-    }
+    return {"queries": queries, "exactCount": len([c for c in clips if c.get("match") == "exact"]), "relatedCount": len([c for c in clips if c.get("match") == "related"]), "targetSegmentSeconds": TARGET_SEGMENT_SECONDS, "minSegmentSeconds": MIN_SEGMENT_SECONDS, "maxSegmentSeconds": MAX_SEGMENT_SECONDS, "clips": clips[:1500]}
 
 
 @app.get("/health")
 def health():
-    return jsonify({"ok": True, "service": "Clip AI Bot"})
+    return jsonify({"ok": True, "service": "Clip AI Bot", "targetSegmentSeconds": TARGET_SEGMENT_SECONDS})
 
 
 @app.post("/api/auto-fill")
@@ -421,6 +409,16 @@ def api_search_clips():
     pexels_key = clean(data.get("pexelsKey") or os.getenv("PEXELS_API_KEY"))
     many = bool(data.get("many"))
     return jsonify(strict_search(subject, fact, scene, pixabay_key, pexels_key, many))
+
+
+@app.post("/api/clip-video")
+def api_clip_video():
+    data = request.get_json(force=True) or {}
+    clip = data.get("clip") or data
+    subject = clean(data.get("subject"))
+    scene = clean(data.get("scene"))
+    result = trim_clip_with_ffmpeg(clip, subject, scene)
+    return jsonify(result)
 
 
 if __name__ == "__main__":
