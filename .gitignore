@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local app runtime
+.forge-bot/
+rendered_uploads/
+integrations/uploader_runtime/.youtube_token.json
+integrations/uploader_runtime/direct_render_upload_state.json
+integrations/uploader_runtime/social_upload_state.json
+
+# Secrets
+.env
+*.env
+*client_secret*.json
+*client-secrets*.json
+*token*.json
+*.secret.json
+
+# OS files
+.DS_Store
