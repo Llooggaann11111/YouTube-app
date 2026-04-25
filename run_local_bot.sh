@@ -5,4 +5,4 @@ python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python clip_ai_bot.py
+python smart_media_bot.py
