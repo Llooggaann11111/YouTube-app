@@ -23,9 +23,11 @@ jobs:
       - name: Frontend syntax check
         run: |
           node --check app-v16.js
+          node --check app-v16-segment-fix.js
+          node --check app-v16-smart-bridge.js
       - name: Python syntax check
         run: |
-          python -m py_compile clip_ai_bot.py youtube_upload_bot.py
+          python -m py_compile clip_ai_bot.py smart_media_bot.py media_intelligence.py youtube_upload_bot.py
       - name: Run Python tests
         run: |
           pytest -q
