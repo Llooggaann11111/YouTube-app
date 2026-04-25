@@ -1,5 +1,64 @@
+function segmentWords(text) {
+  return clean(text)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word.length > 2)
+    .slice(0, 40);
+}
+
+function chooseSegmentForClip(clip) {
+  const copy = { ...clip };
+  const duration = Number(copy.duration || 0);
+  const text = `${copy.tags || ""} ${copy.credit || ""} ${copy.source || ""} ${copy.pageUrl || ""}`.toLowerCase();
+  const sceneTokens = new Set(segmentWords(`${state.scene || ""} ${state.subject || ""}`));
+  const iconicWords = new Set(["speech", "podium", "march", "protest", "court", "trial", "hearing", "eruption", "explosion", "launch", "goal", "ceremony", "interview", "debate", "performance", "experiment", "demonstration", "rescue", "historic", "famous", "iconic"]);
+  let iconicScore = 0;
+  for (const word of segmentWords(text)) {
+    if (sceneTokens.has(word) || iconicWords.has(word)) iconicScore += 1;
+  }
+
+  let clipDuration = 25;
+  if (duration > 0 && duration < 25) clipDuration = Math.min(duration, 30);
+  if (duration > 0 && duration <= 30) clipDuration = duration;
+
+  let startTime = 0;
+  let reason = duration ? "source already short" : "duration unknown, use first 25 seconds";
+  if (duration > 30) {
+    const latestStart = Math.max(0, duration - clipDuration);
+    if (copy.match === "exact" && iconicScore > 0) {
+      startTime = Math.min(Math.max(8, duration * 0.18), latestStart);
+      reason = "exact topic, starts near likely action point";
+    } else if (iconicScore > 0) {
+      startTime = Math.min(Math.max(5, duration * 0.12), latestStart);
+      reason = "scene keywords found, starts near likely visual action";
+    } else {
+      startTime = Math.min(10, latestStart);
+      reason = "long source, avoid using the full video";
+    }
+  }
+
+  copy.startTime = Math.round(startTime * 100) / 100;
+  copy.clipDuration = Math.round(clipDuration * 100) / 100;
+  copy.trimToSeconds = copy.clipDuration;
+  copy.endTime = Math.round((copy.startTime + copy.clipDuration) * 100) / 100;
+  copy.needsTrim = duration > 30;
+  copy.iconicScore = iconicScore;
+  copy.segmentReason = reason;
+  return copy;
+}
+
+function addClip(index) {
+  const clip = state.clips[index];
+  if (!clip) return;
+  state.timeline.push(chooseSegmentForClip(clip));
+  save();
+  renderTimeline();
+  renderPost();
+  toast("Clip added as a short segment");
+}
+
 function getTimelineClip(index) {
-  return state.timeline[index] || {};
+  return chooseSegmentForClip(state.timeline[index] || {});
 }
 
 function getClipStart(clip) {
@@ -13,6 +72,38 @@ function getClipDuration(clip, fallback) {
   return Math.min(30, Math.max(1, fallback || 25));
 }
 
+const originalRenderTimeline = renderTimeline;
+renderTimeline = function renderTimelineWithSegments() {
+  const box = $("#timeline");
+  if (!box) return;
+  const count = $("#timelineCount");
+  if (count) count.textContent = `${state.timeline.length} clips selected. Final length: ${state.length} seconds.`;
+  box.innerHTML = state.timeline.length ? "" : `<div class="box">No clips added yet.</div>`;
+  state.timeline.forEach((rawClip, index) => {
+    const clip = chooseSegmentForClip(rawClip);
+    state.timeline[index] = clip;
+    const item = document.createElement("div");
+    item.className = "item";
+    item.innerHTML = `
+      <div>
+        <strong>Clip ${index + 1} · ${esc(clip.source)}</strong>
+        <small>${esc(clip.license)}</small>
+        <small>Using ${clip.startTime}s to ${clip.endTime}s, ${clip.clipDuration}s total</small>
+        <small>${esc(clip.segmentReason || "short segment selected")}</small>
+        <small>${esc(clip.pageUrl)}</small>
+      </div>
+      <button type="button" data-remove="${index}">×</button>`;
+    box.appendChild(item);
+  });
+  $$('[data-remove]').forEach((button) => button.onclick = () => {
+    state.timeline.splice(Number(button.dataset.remove), 1);
+    save();
+    renderTimeline();
+    renderPost();
+  });
+  save();
+};
+
 async function renderVideo() {
   syncFromFields(true);
   const canvas = $("#canvas");
@@ -20,6 +111,10 @@ async function renderVideo() {
     toast("This browser cannot render video.");
     return;
   }
+
+  state.timeline = state.timeline.map(chooseSegmentForClip);
+  save();
+  renderTimeline();
 
   const ctx = canvas.getContext("2d");
   const totalDuration = Math.min(45, Math.max(25, Number(state.length) || 30));
@@ -111,4 +206,5 @@ async function renderVideo() {
 window.addEventListener("DOMContentLoaded", () => {
   const button = $("#renderBtn");
   if (button) button.onclick = renderVideo;
+  renderTimeline();
 });
