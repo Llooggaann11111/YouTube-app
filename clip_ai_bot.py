@@ -10,11 +10,21 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+TARGET_SEGMENT_SECONDS = 25
+MIN_SEGMENT_SECONDS = 20
+MAX_SEGMENT_SECONDS = 30
+
 STOP_WORDS = {
     "the", "and", "for", "with", "that", "this", "from", "into", "about", "after",
     "before", "when", "what", "why", "how", "was", "were", "are", "his", "her",
     "their", "who", "has", "had", "have", "did", "does", "junior", "jr", "mrs", "mr",
     "person", "people", "became", "because", "through", "during", "against", "between",
+}
+
+ICONIC_KEYWORDS = {
+    "speech", "podium", "march", "protest", "court", "trial", "hearing", "eruption",
+    "explosion", "launch", "goal", "ceremony", "interview", "debate", "performance",
+    "experiment", "demonstration", "rescue", "historic", "famous", "iconic",
 }
 
 SCENE_RULES = [
@@ -63,6 +73,61 @@ def scene_from_text(text: str) -> str:
     return " ".join(tokens(text, 8))
 
 
+def safe_float(value: Any, default: float = 0.0) -> float:
+    try:
+        return float(value or default)
+    except (TypeError, ValueError):
+        return default
+
+
+def clip_text(clip: Dict[str, Any]) -> str:
+    fields = ["title", "tags", "creator", "credit", "source", "pageUrl"]
+    return clean(" ".join(str(clip.get(k, "")) for k in fields)).lower()
+
+
+def choose_iconic_segment(clip: Dict[str, Any], subject: str, scene: str) -> Dict[str, Any]:
+    """Pick a 20 to 30 second segment instead of using an entire long source video.
+
+    This is a safe heuristic. It cannot truly watch the video without computer vision,
+    but it chooses a strong short window and marks the clip for trimming.
+    """
+    duration = safe_float(clip.get("duration"), 0.0)
+    text = clip_text(clip)
+    scene_tokens = set(tokens(scene, 12))
+    iconic_hits = len((scene_tokens | ICONIC_KEYWORDS).intersection(set(tokens(text, 40))))
+
+    segment_length = TARGET_SEGMENT_SECONDS
+    if duration and duration < TARGET_SEGMENT_SECONDS:
+        segment_length = max(1, min(duration, MAX_SEGMENT_SECONDS))
+    elif duration and duration <= MAX_SEGMENT_SECONDS:
+        segment_length = duration
+
+    if not duration or duration <= MAX_SEGMENT_SECONDS:
+        start = 0.0
+        reason = "source already short" if duration else "duration unknown, use first 25 seconds"
+    else:
+        latest_start = max(0.0, duration - segment_length)
+        if clip.get("match") == "exact" and iconic_hits:
+            start = min(max(8.0, duration * 0.18), latest_start)
+            reason = "exact topic, starts near likely action point"
+        elif iconic_hits:
+            start = min(max(5.0, duration * 0.12), latest_start)
+            reason = "scene keywords found, starts near likely visual action"
+        else:
+            start = min(10.0, latest_start)
+            reason = "long source, avoid using the full video"
+
+    end = start + segment_length
+    clip["startTime"] = round(start, 2)
+    clip["endTime"] = round(end, 2)
+    clip["clipDuration"] = round(segment_length, 2)
+    clip["trimToSeconds"] = round(segment_length, 2)
+    clip["segmentReason"] = reason
+    clip["needsTrim"] = bool(duration and duration > MAX_SEGMENT_SECONDS)
+    clip["iconicScore"] = iconic_hits
+    return clip
+
+
 def wiki_summary(subject: str) -> Dict[str, str]:
     subject = clean(subject)
     if not subject:
@@ -109,11 +174,6 @@ def build_queries(subject: str, fact: str, scene: str) -> Dict[str, List[str]]:
     return {"exact": exact, "related": related[:5]}
 
 
-def clip_text(clip: Dict[str, Any]) -> str:
-    fields = ["title", "tags", "creator", "credit", "source", "pageUrl"]
-    return clean(" ".join(str(clip.get(k, "")) for k in fields)).lower()
-
-
 def subject_match(clip: Dict[str, Any], subject: str) -> bool:
     subject_tokens = tokens(subject, 8)
     if not subject_tokens:
@@ -150,17 +210,20 @@ def score_clip(clip: Dict[str, Any], subject: str, scene: str) -> float:
     license_text = clean(clip.get("license")).lower()
     if "public" in license_text or "cc0" in license_text:
         score += 4
-    duration = float(clip.get("duration") or 0)
-    if 8 <= duration <= 90:
-        score += 3
+    duration = safe_float(clip.get("duration"), 0.0)
+    if MIN_SEGMENT_SECONDS <= duration <= 90:
+        score += 6
+    elif duration > 90:
+        score -= 2
+    score += min(clip.get("iconicScore", 0), 5)
     return score
 
 
-def normalize_clip(clip: Dict[str, Any]) -> Dict[str, Any]:
+def normalize_clip(clip: Dict[str, Any], subject: str = "", scene: str = "") -> Dict[str, Any]:
     creator = clean(clip.get("creator") or clip.get("credit") or "Unknown creator")
     clip["creator"] = creator
     clip["credit"] = creator
-    return clip
+    return choose_iconic_segment(clip, subject, scene)
 
 
 def search_pixabay(query: str, api_key: str, pages: int = 1) -> List[Dict[str, Any]]:
@@ -189,7 +252,7 @@ def search_pixabay(query: str, api_key: str, pages: int = 1) -> List[Dict[str, A
                 file = videos.get("medium") or videos.get("small") or videos.get("large") or videos.get("tiny")
                 if not file or not file.get("url"):
                     continue
-                clips.append(normalize_clip({
+                clips.append({
                     "id": f"pixabay-{hit.get('id')}",
                     "source": "Pixabay",
                     "title": hit.get("tags") or query,
@@ -200,7 +263,7 @@ def search_pixabay(query: str, api_key: str, pages: int = 1) -> List[Dict[str, A
                     "previewUrl": file.get("url"),
                     "duration": hit.get("duration") or 0,
                     "license": "Pixabay Content License",
-                }))
+                })
         except Exception:
             continue
     return clips
@@ -226,7 +289,7 @@ def search_pexels(query: str, api_key: str, pages: int = 1) -> List[Dict[str, An
                 file = (vertical or files or [{}])[0]
                 if not file.get("link"):
                     continue
-                clips.append(normalize_clip({
+                clips.append({
                     "id": f"pexels-{video.get('id')}",
                     "source": "Pexels",
                     "title": query,
@@ -237,7 +300,7 @@ def search_pexels(query: str, api_key: str, pages: int = 1) -> List[Dict[str, An
                     "previewUrl": file.get("link"),
                     "duration": video.get("duration") or 0,
                     "license": "Pexels License",
-                }))
+                })
         except Exception:
             continue
     return clips
@@ -276,7 +339,7 @@ def search_commons(query: str, pages: int = 1) -> List[Dict[str, Any]]:
                 artist = clean((meta.get("Artist") or {}).get("value") or "Wikimedia contributor")
                 artist = re.sub(r"<[^>]+>", "", artist)
                 media_title = clean(page.get("title") or "").replace("File:", ""))
-                clips.append(normalize_clip({
+                clips.append({
                     "id": f"commons-{page.get('pageid')}",
                     "source": "Wikimedia Commons",
                     "title": media_title,
@@ -287,7 +350,7 @@ def search_commons(query: str, pages: int = 1) -> List[Dict[str, Any]]:
                     "previewUrl": info.get("url"),
                     "duration": 0,
                     "license": license_name,
-                }))
+                })
             offset = data.get("continue", {}).get("gsroffset")
             if not offset:
                 break
@@ -315,13 +378,13 @@ def strict_search(subject: str, fact: str, scene: str, pixabay_key: str, pexels_
     for clip in raw:
         if not clip.get("videoUrl"):
             continue
-        clip = normalize_clip(clip)
         if subject_match(clip, subject):
             clip["match"] = "exact"
         elif scene_match(clip, scene):
             clip["match"] = "related"
         else:
             continue
+        clip = normalize_clip(clip, subject, scene)
         by_id[clip["id"]] = clip
 
     clips = list(by_id.values())
@@ -330,6 +393,9 @@ def strict_search(subject: str, fact: str, scene: str, pixabay_key: str, pexels_
         "queries": queries,
         "exactCount": len([c for c in clips if c.get("match") == "exact"]),
         "relatedCount": len([c for c in clips if c.get("match") == "related"]),
+        "targetSegmentSeconds": TARGET_SEGMENT_SECONDS,
+        "minSegmentSeconds": MIN_SEGMENT_SECONDS,
+        "maxSegmentSeconds": MAX_SEGMENT_SECONDS,
         "clips": clips[:1500],
     }
 
