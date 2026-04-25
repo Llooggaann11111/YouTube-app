@@ -1,7 +1,6 @@
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 import clip_ai_bot
 
@@ -41,7 +40,48 @@ def test_subject_match_filters_random_clip():
     assert clip_ai_bot.subject_match(good_clip, "Nikola Tesla")
 
 
-def test_strict_search_keeps_only_relevant(monkeypatch):
+def test_iconic_segment_clips_long_video_to_20_30_seconds():
+    clip = {
+        "id": "long-speech",
+        "source": "Wikimedia Commons",
+        "title": "Famous speech podium crowd",
+        "tags": "speech podium crowd civil rights",
+        "creator": "Creator",
+        "pageUrl": "https://example.com/speech",
+        "videoUrl": "https://example.com/speech.mp4",
+        "previewUrl": "https://example.com/speech.mp4",
+        "duration": 3600,
+        "license": "CC BY",
+        "match": "exact",
+    }
+    clipped = clip_ai_bot.choose_iconic_segment(clip, "Famous speech", "speech podium crowd audience")
+    assert 20 <= clipped["clipDuration"] <= 30
+    assert clipped["endTime"] - clipped["startTime"] <= 30
+    assert clipped["needsTrim"] is True
+    assert clipped["startTime"] > 0
+
+
+def test_short_video_is_not_forced_past_real_duration():
+    clip = {
+        "id": "short-clip",
+        "source": "Pixabay",
+        "title": "Volcano eruption lava",
+        "tags": "volcano eruption lava smoke",
+        "creator": "Creator",
+        "pageUrl": "https://example.com/volcano",
+        "videoUrl": "https://example.com/volcano.mp4",
+        "previewUrl": "https://example.com/volcano.mp4",
+        "duration": 12,
+        "license": "Pixabay Content License",
+        "match": "related",
+    }
+    clipped = clip_ai_bot.choose_iconic_segment(clip, "Volcano", "volcano lava eruption smoke mountain")
+    assert clipped["clipDuration"] == 12
+    assert clipped["startTime"] == 0
+    assert clipped["endTime"] == 12
+
+
+def test_strict_search_keeps_only_relevant_and_adds_segment(monkeypatch):
     def fake_pixabay(query, api_key, pages=1):
         return [
             {
@@ -53,7 +93,7 @@ def test_strict_search_keeps_only_relevant(monkeypatch):
                 "pageUrl": "https://example.com/random",
                 "videoUrl": "https://example.com/random.mp4",
                 "previewUrl": "https://example.com/random.mp4",
-                "duration": 20,
+                "duration": 3600,
                 "license": "Pixabay Content License",
             },
             {
@@ -65,7 +105,7 @@ def test_strict_search_keeps_only_relevant(monkeypatch):
                 "pageUrl": "https://example.com/tesla",
                 "videoUrl": "https://example.com/tesla.mp4",
                 "previewUrl": "https://example.com/tesla.mp4",
-                "duration": 20,
+                "duration": 3600,
                 "license": "Pixabay Content License",
             },
         ]
@@ -86,6 +126,9 @@ def test_strict_search_keeps_only_relevant(monkeypatch):
     assert "tesla-lab" in ids
     assert "random-old-film" not in ids
     assert result["exactCount"] >= 1
+    tesla = next(clip for clip in result["clips"] if clip["id"] == "tesla-lab")
+    assert 20 <= tesla["clipDuration"] <= 30
+    assert tesla["needsTrim"] is True
 
 
 def test_youtube_uploader_dry_run(tmp_path):
