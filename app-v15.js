@@ -64,6 +64,63 @@ const SEARCH_STOP_WORDS = new Set([
 const PERSON_WORD_RE =
   /\b(inventor|scientist|engineer|physicist|chemist|mathematician|artist|writer|president|king|queen|actor|founder|born|died|biography|portrait|professor|activist|athlete|singer|composer|entrepreneur|leader|explorer)\b/;
 
+const PERSON_VISUAL_ANCHORS = [
+  "portrait",
+  "photo",
+  "photograph",
+  "image",
+  "biography",
+  "documentary",
+  "archive",
+  "archival",
+  "museum",
+  "laboratory",
+  "lab",
+  "experiment",
+  "research",
+  "inventor",
+  "scientist",
+  "engineer",
+  "physicist",
+  "electricity",
+  "electrical",
+  "invention",
+  "equipment",
+  "demonstration",
+  "coil",
+  "current",
+  "power",
+  "motor",
+  "wireless",
+  "radio",
+  "historic",
+  "historical",
+  "memorial",
+  "statue",
+  "reenactment",
+];
+
+const PERSON_BAD_MEDIA_TERMS = [
+  "streamyard",
+  "webinar",
+  "podcast",
+  "livestream",
+  "live stream",
+  "zoom",
+  "meeting",
+  "conference call",
+  "panel discussion",
+  "talk show",
+  "talking head",
+  "webcam",
+  "video call",
+  "online event",
+  "host",
+  "guest",
+  "episode",
+  "reaction",
+];
+
 const KNOWN_PERSON_SUBJECTS = [
   "Nikola Tesla",
   "Albert Einstein",
@@ -543,6 +600,12 @@ function loadState() {
   mergeLegacyState();
   applyStateToInputs();
   syncFromInputs({ write: false });
+  if (state.clips.length) {
+    classifyClips(state.clips);
+  }
+  if (state.timeline.length) {
+    state.timeline = state.timeline.filter((clip) => subjectMatch(clip) || sceneMatch(clip));
+  }
 }
 
 function syncFromInputs(options = {}) {
@@ -572,6 +635,7 @@ function syncFromInputs(options = {}) {
   state.length = Math.min(45, Math.max(25, Number(state.length) || 30));
   if (clearClips) {
     state.clips = [];
+    state.timeline = [];
   }
   if (write) {
     saveState();
@@ -852,6 +916,31 @@ function hasForbiddenTerms(clip) {
   });
 }
 
+function clipHasAnyTerm(clip, terms) {
+  const text = clipText(clip);
+  return terms.some((term) => {
+    const lowered = clean(term).toLowerCase();
+    const parts = keywordList(lowered);
+    if (lowered.includes(" ")) {
+      return text.includes(lowered);
+    }
+    return hasToken(text, parts[0] || lowered);
+  });
+}
+
+function personVisualEvidenceScore(clip) {
+  const text = clipText(clip);
+  return matchedTokens(PERSON_VISUAL_ANCHORS, text).length;
+}
+
+function isBadPersonMediaClip(clip) {
+  return isPersonLikeSubject() && clipHasAnyTerm(clip, PERSON_BAD_MEDIA_TERMS);
+}
+
+function shouldRejectClip(clip) {
+  return hasForbiddenTerms(clip) || isBadPersonMediaClip(clip);
+}
+
 function personExactHits(tokens, text) {
   if (tokens.length < 2) {
     return matchedTokens(tokens, text, { fuzzy: true }).length;
@@ -866,25 +955,8 @@ function personExactHits(tokens, text) {
 function personAnchorTokens() {
   return Array.from(
     new Set([
-      "portrait",
-      "biography",
-      "documentary",
-      "archive",
-      "museum",
-      "interview",
-      "laboratory",
-      "experiment",
-      "research",
-      "inventor",
-      "scientist",
-      "engineer",
-      "physicist",
-      "electricity",
-      "invention",
+      ...PERSON_VISUAL_ANCHORS,
       "lecture",
-      "historic",
-      "memorial",
-      "statue",
       "concert",
       "stage",
       "athlete",
@@ -898,17 +970,20 @@ function subjectMatch(clip) {
   if (!tokens.length) {
     return false;
   }
-  if (hasForbiddenTerms(clip)) {
+  if (shouldRejectClip(clip)) {
     return false;
   }
   const text = clipText(clip);
   const hits = isPersonLikeSubject() ? personExactHits(tokens, text) : matchedTokens(tokens, text).length;
   const fullSubject = clean(state.subject).toLowerCase();
+  if (isPersonLikeSubject() && tokens.length >= 2) {
+    const canonical = canonicalSubject().toLowerCase();
+    const fullNameHit = canonical && text.includes(canonical);
+    const visualEvidence = personVisualEvidenceScore(clip);
+    return hits >= tokens.length && fullNameHit && visualEvidence >= 1;
+  }
   if (fullSubject && text.includes(fullSubject)) {
     return true;
-  }
-  if (isPersonLikeSubject() && tokens.length >= 2) {
-    return hits >= tokens.length;
   }
   return tokens.length === 1 ? hits === 1 : hits >= Math.ceil(tokens.length * 0.75);
 }
@@ -918,7 +993,7 @@ function sceneMatch(clip) {
   if (!tokens.length) {
     return false;
   }
-  if (hasForbiddenTerms(clip)) {
+  if (shouldRejectClip(clip)) {
     return false;
   }
   const text = clipText(clip);
@@ -927,7 +1002,7 @@ function sceneMatch(clip) {
   const detailHits = matchedTokens(detailTokens(), text).length;
   if (isPersonLikeSubject()) {
     const personContextHits = matchedTokens(personAnchorTokens(), text).length;
-    return hits >= Math.min(2, tokens.length) && (subjectHits >= 2 || detailHits >= 2 || personContextHits >= 2);
+    return hits >= Math.min(2, tokens.length) && personContextHits >= 2 && (subjectHits >= 2 || detailHits >= 2 || personContextHits >= 3);
   }
   return hits >= Math.min(2, tokens.length);
 }
@@ -939,10 +1014,12 @@ function clipScore(clip) {
   const sceneHits = matchedTokens(sceneTokens(), text);
   const detailHits = matchedTokens(detailTokens(), text);
   const visualHits = matchedTokens(visualContextTokens(), text);
+  const personVisualHits = isPersonLikeSubject() ? matchedTokens(PERSON_VISUAL_ANCHORS, text) : [];
   score += subjectHits.length * 20;
   score += sceneHits.length * 6;
   score += detailHits.length * 8;
   score += visualHits.length * 7;
+  score += personVisualHits.length * 10;
   if (clean(state.subject) && text.includes(clean(state.subject).toLowerCase())) {
     score += 45;
   }
@@ -964,13 +1041,13 @@ function clipScore(clip) {
   if (Number(clip.duration) >= 6) {
     score += 4;
   }
-  if (hasForbiddenTerms(clip)) {
-    score -= 200;
+  if (shouldRejectClip(clip)) {
+    score -= 300;
   }
   clip.score = score;
   clip.reason =
-    subjectHits.length || sceneHits.length || detailHits.length || visualHits.length
-      ? [...subjectHits, ...sceneHits, ...detailHits, ...visualHits].slice(0, 6).join(", ")
+    subjectHits.length || sceneHits.length || detailHits.length || visualHits.length || personVisualHits.length
+      ? [...subjectHits, ...sceneHits, ...detailHits, ...visualHits, ...personVisualHits].slice(0, 6).join(", ")
       : "source metadata";
   return score;
 }
@@ -1191,8 +1268,11 @@ async function searchClips(many) {
   syncFromInputs();
   await resolveSubjectBeforeSearch();
   state.clips = [];
+  state.timeline = [];
   saveState();
   renderClips();
+  renderTimeline();
+  renderPostPackage();
 
   const queries = searchQueries();
   const runs = [
