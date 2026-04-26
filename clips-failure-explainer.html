@@ -1,0 +1,13 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FactPulse Source Failures</title><style>body{margin:0;background:#050609;color:#f6f7fb;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-weight:750}.app{max-width:900px;margin:0 auto;padding:18px}.card{background:#11141b;border:1px solid #2b313d;border-radius:24px;padding:20px;margin:14px 0}.ok{color:#18f038}.warn{color:#ffd166}.bad{color:#ff4d5d}a,.btn{display:inline-block;background:#18f038;color:#031007;text-decoration:none;border-radius:16px;padding:14px 18px;font-weight:1000}.box{background:#070a0f;border:1px solid #2b313d;border-radius:18px;padding:14px;white-space:pre-wrap;line-height:1.45}</style></head><body><div class="app"><h1>FactPulse source failure guide</h1><div class="card"><h2>What your log means</h2><div class="box">YouTube: 0 means no YouTube Data API key was entered, the key is wrong, quota is used up, or no embeddable matches were returned.
+
+Wikimedia: 0 or 2 means it searched correctly, but only found a few Creative Commons videos that matched the exact subject.
+
+Internet Archive: 8 means this source worked. Those are the usable clips the app found.
+
+Library of Congress: searched, then failed means the browser/proxy allowed some requests and blocked others. This is not a search logic problem.
+
+National Archives: failed or blocked means the API is not reliable from a static GitHub Pages browser app. It needs a backend proxy.
+
+DVIDS: failed or blocked means the API is not reliable from the browser. It needs a backend proxy.
+
+Pixabay, Pexels, Coverr: 0 means no key was entered, stock was off, or the API returned no stock matches.</div></div><div class="card"><h2>Real fix</h2><p>The search page is browser-only. Some government and archive APIs block browser requests. The reliable fix is a small backend proxy. It would search National Archives, DVIDS, Library of Congress, YouTube, Wikimedia, Internet Archive, Pixabay, Pexels, and Coverr from a server, then send clean results back to the app.</p><p>Without that backend, the app can only use sources that allow browser requests.</p></div><div class="card"><h2>Use now</h2><p>For celebrity clips, add a YouTube Data API key. For renderable background footage, add Pixabay and Pexels keys.</p><a href="clips-v22.html">Back to Clips v22</a></div></div></body></html>
