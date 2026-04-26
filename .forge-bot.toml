@@ -1,0 +1,50 @@
+[bot]
+ignore_dirs = [".git", ".forge-bot", "__pycache__", "rendered_uploads", "integrations/uploader_runtime"]
+limit_files = 12
+fail_on = "medium"
+project_profile = "generic"
+
+[ai]
+enabled = false
+
+[watch]
+interval = 10.0
+report_path = ".forge-bot/watch_report.txt"
+state_path = ".forge-bot/watch_state.json"
+apply_changes = true
+
+[daemon]
+restart_delay = 10.0
+status_file = ".forge-bot/daemon_status.json"
+
+[research]
+max_pages = 2
+timeout = 10.0
+follow_links = false
+allow_external = false
+
+[online]
+enabled = true
+interval = 900.0
+urls = [
+  "https://llooggaann11111.github.io/YouTube-app/create-v15.html",
+  "https://llooggaann11111.github.io/YouTube-app/clips-v15.html",
+]
+allow_domains = ["llooggaann11111.github.io"]
+report_path = ".forge-bot/online_report.txt"
+approval = "safe-fixes"
+max_pages = 2
+timeout = 10.0
+follow_links = false
+allow_external = false
+backoff_initial = 60.0
+backoff_max = 1800.0
+
+[upgrade]
+enabled = false
+
+[checks]
+commands = [
+  "node --check app-v15.js",
+  "python3 -m py_compile app_server.py upload_rendered_video.py",
+]
