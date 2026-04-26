@@ -21,8 +21,59 @@ let state = {
 let lastRenderedBlob = null;
 let integrationStatusCache = null;
 
+const SEARCH_STOP_WORDS = new Set([
+  "the",
+  "and",
+  "for",
+  "with",
+  "that",
+  "this",
+  "from",
+  "into",
+  "about",
+  "after",
+  "before",
+  "when",
+  "what",
+  "why",
+  "how",
+  "was",
+  "were",
+  "are",
+  "his",
+  "her",
+  "their",
+  "who",
+  "has",
+  "had",
+  "have",
+  "did",
+  "does",
+  "junior",
+  "official",
+  "video",
+  "clip",
+  "stock",
+  "footage",
+  "background",
+  "broll",
+  "roll",
+]);
+
 function clean(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeWord(word) {
+  let token = String(word || "").toLowerCase();
+  if (token.endsWith("ies") && token.length > 5) {
+    token = `${token.slice(0, -3)}y`;
+  } else if (token.endsWith("es") && token.length > 5) {
+    token = token.slice(0, -2);
+  } else if (token.endsWith("s") && token.length > 4) {
+    token = token.slice(0, -1);
+  }
+  return token;
 }
 
 function escapeHtml(value) {
@@ -31,6 +82,10 @@ function escapeHtml(value) {
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+}
+
+function escapeRegex(value) {
+  return String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function toast(message) {
@@ -44,44 +99,17 @@ function toast(message) {
 }
 
 function keywordList(text) {
-  return clean(text)
+  const words = clean(text)
     .toLowerCase()
     .split(/[^a-z0-9]+/)
+    .map(normalizeWord)
     .filter(
       (word) =>
         word.length > 2 &&
-        ![
-          "the",
-          "and",
-          "for",
-          "with",
-          "that",
-          "this",
-          "from",
-          "into",
-          "about",
-          "after",
-          "before",
-          "when",
-          "what",
-          "why",
-          "how",
-          "was",
-          "were",
-          "are",
-          "his",
-          "her",
-          "their",
-          "who",
-          "has",
-          "had",
-          "have",
-          "did",
-          "does",
-          "junior",
-        ].includes(word)
+        !SEARCH_STOP_WORDS.has(word)
     )
-    .slice(0, 18);
+    .slice(0, 28);
+  return Array.from(new Set(words));
 }
 
 function titleCase(text) {
@@ -102,8 +130,9 @@ function autoSceneText(text) {
   const mappings = [
     ["court", "courtroom judge lawyer courthouse hearing documents"],
     ["speech", "speech podium microphone crowd"],
-    ["inventor", "inventor lab electricity machine"],
-    ["science", "science lab microscope experiment"],
+    ["inventor", "inventor laboratory electricity invention machine experiment"],
+    ["scientist", "scientist laboratory experiment research equipment"],
+    ["science", "science laboratory microscope experiment research"],
     ["money", "money cash bank finance coins wallet"],
     ["space", "space rocket planet astronaut galaxy"],
     ["ocean", "ocean waves underwater sea"],
@@ -141,6 +170,14 @@ function detailTokens() {
 
 function sceneTokens() {
   return keywordList(clean(state.scene) || autoSceneText(`${state.subject} ${state.fact}`)).slice(0, 10);
+}
+
+function visualContextTokens() {
+  const subject = new Set(subjectTokens());
+  return mergedKeywords(state.scene, state.details, state.fact)
+    .filter((token) => !subject.has(token))
+    .filter((token) => !["known", "topic", "detail", "context", "fact"].includes(token))
+    .slice(0, 14);
 }
 
 function isPersonLikeSubject() {
@@ -181,6 +218,14 @@ function forbiddenContextTerms() {
       allow: ["fire", "explosion", "disaster", "blast", "eruption", "volcano", "crash"],
       block: ["detonation", "blast", "explosion"],
     },
+    {
+      allow: ["car", "vehicle", "traffic", "road", "driving", "automotive"],
+      block: ["car", "vehicle", "automotive", "cybertruck", "autopilot", "dealership", "driver", "driving", "traffic"],
+    },
+    {
+      allow: ["music", "singer", "concert", "song", "album"],
+      block: ["lyrics", "karaoke", "cover song", "music video"],
+    },
   ];
 
   const blocked = new Set();
@@ -204,33 +249,34 @@ function urlWords(url) {
 
 function searchQueries() {
   const subject = clean(state.subject);
-  const scene = clean(state.scene) || autoSceneText(`${state.subject} ${state.fact}`);
   const scenePhrase = sceneTokens().slice(0, 5).join(" ");
-  const detailPhrase = detailTokens().slice(0, 6).join(" ");
+  const visualPhrase = visualContextTokens().slice(0, 5).join(" ");
+  const detailPhrase = detailTokens().slice(0, 5).join(" ");
   const exact = Array.from(
     new Set(
       [
         subject,
-        subject && detailPhrase ? `${subject} ${detailTokens().slice(0, 2).join(" ")}` : "",
-        isPersonLikeSubject() && subject ? `${subject} portrait` : "",
+        subject && detailPhrase ? `${subject} ${detailTokens().slice(0, 3).join(" ")}` : "",
+        isPersonLikeSubject() && subject ? `${subject} biography documentary` : "",
+        isPersonLikeSubject() && subject ? `${subject} portrait laboratory` : "",
       ]
         .map(clean)
         .filter(Boolean)
     )
-  ).slice(0, 3);
+  ).slice(0, 4);
   const relatedSeed = isPersonLikeSubject()
     ? [
         `${subject} ${scenePhrase}`,
-        `${subject} ${detailTokens().slice(0, 3).join(" ")}`,
-        `${detailTokens().slice(0, 4).join(" ")} ${scenePhrase}`,
-        `${scenePhrase} scientist inventor laboratory`,
-        `${scenePhrase} documentary b roll`,
+        visualPhrase,
+        `${visualContextTokens().slice(0, 3).join(" ")} laboratory experiment`,
+        `${scenePhrase} research equipment close up`,
+        `${scenePhrase} documentary reenactment`,
       ]
     : [
-        `${subject} ${scene}`,
-        scene,
-        keywordList(state.fact).slice(0, 6).join(" "),
-        `${scene} b roll`,
+        `${subject} ${scenePhrase}`,
+        scenePhrase,
+        visualPhrase,
+        `${scenePhrase} close up`,
       ];
   const related = Array.from(new Set(relatedSeed.map(clean).filter(Boolean))).slice(0, 5);
   return {
@@ -473,15 +519,37 @@ function isAllowedLicense(license) {
 }
 
 function clipText(clip) {
-  return [clip.title, clip.tags, clip.credit, clip.metadata, urlWords(clip.pageUrl), clip.source]
+  return [clip.title, clip.tags, clip.credit, clip.metadata, urlWords(clip.pageUrl)]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
+function hasToken(text, token) {
+  return new RegExp(`(^|[^a-z0-9])${escapeRegex(token)}([^a-z0-9]|$)`, "i").test(text);
+}
+
+function matchedTokens(tokens, text) {
+  return tokens.filter((token) => hasToken(text, token));
+}
+
 function hasForbiddenTerms(clip) {
   const text = clipText(clip);
-  return forbiddenContextTerms().some((term) => text.includes(term));
+  return forbiddenContextTerms().some((term) => {
+    const parts = keywordList(term);
+    return parts.length > 1 ? text.includes(parts.join(" ")) : hasToken(text, parts[0] || term);
+  });
+}
+
+function personExactHits(tokens, text) {
+  if (tokens.length < 2) {
+    return matchedTokens(tokens, text).length;
+  }
+  const first = tokens[0];
+  const last = tokens[tokens.length - 1];
+  const hasFirst = hasToken(text, first);
+  const hasLast = hasToken(text, last);
+  return hasFirst && hasLast ? tokens.length : matchedTokens(tokens, text).length;
 }
 
 function subjectMatch(clip) {
@@ -493,12 +561,19 @@ function subjectMatch(clip) {
     return false;
   }
   const text = clipText(clip);
-  const hits = tokens.filter((token) => text.includes(token)).length;
-  return tokens.length === 1 ? hits === 1 : hits >= Math.min(2, tokens.length);
+  const hits = isPersonLikeSubject() ? personExactHits(tokens, text) : matchedTokens(tokens, text).length;
+  const fullSubject = clean(state.subject).toLowerCase();
+  if (fullSubject && text.includes(fullSubject)) {
+    return true;
+  }
+  if (isPersonLikeSubject() && tokens.length >= 2) {
+    return hits >= tokens.length;
+  }
+  return tokens.length === 1 ? hits === 1 : hits >= Math.ceil(tokens.length * 0.75);
 }
 
 function sceneMatch(clip) {
-  const tokens = sceneTokens();
+  const tokens = Array.from(new Set([...sceneTokens(), ...visualContextTokens()])).slice(0, 14);
   if (!tokens.length) {
     return false;
   }
@@ -506,11 +581,11 @@ function sceneMatch(clip) {
     return false;
   }
   const text = clipText(clip);
-  const hits = tokens.filter((token) => text.includes(token)).length;
-  const subjectHits = subjectTokens().filter((token) => text.includes(token)).length;
-  const detailHits = detailTokens().filter((token) => text.includes(token)).length;
+  const hits = matchedTokens(tokens, text).length;
+  const subjectHits = matchedTokens(subjectTokens(), text).length;
+  const detailHits = matchedTokens(detailTokens(), text).length;
   if (isPersonLikeSubject()) {
-    return hits >= Math.min(2, tokens.length) && (subjectHits >= 1 || detailHits >= 1);
+    return hits >= Math.min(2, tokens.length) && (subjectHits >= 2 || detailHits >= 2 || hits >= 3);
   }
   return hits >= Math.min(2, tokens.length);
 }
@@ -518,21 +593,17 @@ function sceneMatch(clip) {
 function clipScore(clip) {
   const text = clipText(clip);
   let score = 0;
-  subjectTokens().forEach((token) => {
-    if (text.includes(token)) {
-      score += 15;
-    }
-  });
-  sceneTokens().forEach((token) => {
-    if (text.includes(token)) {
-      score += 4;
-    }
-  });
-  detailTokens().forEach((token) => {
-    if (text.includes(token)) {
-      score += 6;
-    }
-  });
+  const subjectHits = matchedTokens(subjectTokens(), text);
+  const sceneHits = matchedTokens(sceneTokens(), text);
+  const detailHits = matchedTokens(detailTokens(), text);
+  const visualHits = matchedTokens(visualContextTokens(), text);
+  score += subjectHits.length * 20;
+  score += sceneHits.length * 6;
+  score += detailHits.length * 8;
+  score += visualHits.length * 7;
+  if (clean(state.subject) && text.includes(clean(state.subject).toLowerCase())) {
+    score += 45;
+  }
   if (clip.match === "exact") {
     score += 60;
   }
@@ -545,6 +616,20 @@ function clipScore(clip) {
   if (isPublicDomain(clip.license)) {
     score += 3;
   }
+  if (Number(clip.width) >= 720 && Number(clip.height) >= 720) {
+    score += 8;
+  }
+  if (Number(clip.duration) >= 6) {
+    score += 4;
+  }
+  if (hasForbiddenTerms(clip)) {
+    score -= 200;
+  }
+  clip.score = score;
+  clip.reason =
+    subjectHits.length || sceneHits.length || detailHits.length || visualHits.length
+      ? [...subjectHits, ...sceneHits, ...detailHits, ...visualHits].slice(0, 6).join(", ")
+      : "source metadata";
   return score;
 }
 
@@ -579,6 +664,7 @@ function classifyClips(allClips) {
 
   state.clips = Array.from(deduped.values())
     .sort((left, right) => clipScore(right) - clipScore(left))
+    .filter((clip) => clipScore(clip) > 0)
     .slice(0, 1500);
 }
 
@@ -645,6 +731,9 @@ async function searchCommons(query) {
         tags: page.title,
         metadata: `${metadata.ObjectName?.value || ""} ${metadata.ImageDescription?.value || ""}`.replace(/<[^>]+>/g, " "),
         searchTerm: query,
+        width: imageInfo.width || 0,
+        height: imageInfo.height || 0,
+        duration: 10,
         license,
       });
     });
@@ -695,6 +784,9 @@ async function searchPixabay(query, many) {
         tags: video.tags || "",
         metadata: urlWords(video.pageURL),
         searchTerm: query,
+        width: file.width || video.videos?.large?.width || 0,
+        height: file.height || video.videos?.large?.height || 0,
+        duration: video.duration || 0,
         license: "Pixabay Content License",
       });
     });
@@ -742,6 +834,9 @@ async function searchPexels(query, many) {
         tags: urlWords(video.url),
         metadata: `${video.id} ${urlWords(video.url)}`,
         searchTerm: query,
+        width: portraitFile.width || video.width || 0,
+        height: portraitFile.height || video.height || 0,
+        duration: video.duration || 0,
         license: "Pexels License",
       });
     });
@@ -798,11 +893,79 @@ function addClip(index) {
   if (!clip) {
     return;
   }
-  state.timeline.push(clip);
+  state.timeline.push(prepareTimelineClip(clip, state.timeline.length, Math.max(1, state.timeline.length + 1)));
   saveState();
   renderTimeline();
   renderPostPackage();
   toast("Clip added");
+}
+
+function clipDiversityKey(clip) {
+  return keywordList(`${clip.source} ${clip.tags || clip.title || ""}`)
+    .slice(0, 3)
+    .join("-");
+}
+
+function prepareTimelineClip(clip, index, total) {
+  const clipLength = Math.max(4, Math.min(7, Math.round(Number(state.length || 30) / Math.max(total, 1))));
+  const duration = Math.max(clipLength, Math.min(Number(clip.duration) || clipLength + 2, 30));
+  const startTime = Math.max(0, Math.min(Number(clip.startTime || 0), Math.max(0, duration - clipLength)));
+  return {
+    ...clip,
+    startTime,
+    clipDuration: clipLength,
+    editLabel: index === 0 ? "hook" : index === total - 1 ? "payoff" : "beat",
+  };
+}
+
+function autoBuildTimeline() {
+  syncFromInputs();
+  if (!state.clips.length) {
+    toast("Find clips first.");
+    return;
+  }
+
+  const desired = Math.max(4, Math.min(7, Math.round(Number(state.length || 30) / 6)));
+  const candidates = [...state.clips]
+    .filter((clip) => clip.videoUrl || clip.previewUrl)
+    .sort((left, right) => clipScore(right) - clipScore(left));
+  const exact = candidates.filter((clip) => clip.match === "exact");
+  const related = candidates.filter((clip) => clip.match !== "exact");
+  const selected = [];
+  const usedIds = new Set();
+  const usedKeys = new Set();
+
+  function takeFrom(list, limit) {
+    for (const clip of list) {
+      if (selected.length >= desired || selected.filter((item) => item.match === clip.match).length >= limit) {
+        break;
+      }
+      const key = clipDiversityKey(clip);
+      if (usedIds.has(clip.id) || (usedKeys.has(key) && selected.length < desired - 1)) {
+        continue;
+      }
+      selected.push(clip);
+      usedIds.add(clip.id);
+      usedKeys.add(key);
+    }
+  }
+
+  takeFrom(exact, Math.min(2, desired));
+  takeFrom(related, desired);
+  if (selected.length < Math.min(3, desired)) {
+    candidates.forEach((clip) => {
+      if (selected.length < desired && !usedIds.has(clip.id)) {
+        selected.push(clip);
+        usedIds.add(clip.id);
+      }
+    });
+  }
+
+  state.timeline = selected.slice(0, desired).map((clip, index, list) => prepareTimelineClip(clip, index, list.length));
+  saveState();
+  renderTimeline();
+  renderPostPackage();
+  toast(state.timeline.length ? "Auto edit built." : "No playable clips found.");
 }
 
 function ensurePreviewModal() {
@@ -913,7 +1076,8 @@ function renderClips() {
         <div class="thumb"><video muted playsinline preload="metadata" src="${clip.previewUrl}"></video></div>
         <strong>${label} · ${escapeHtml(clip.source)}</strong>
         <small>License: ${escapeHtml(clip.license)}</small>
-        <small>Topic: ${escapeHtml((clip.tags || "").slice(0, 100))}</small>
+        <small>Topic: ${escapeHtml((clip.tags || clip.title || "").slice(0, 100))}</small>
+        <small>Matched: ${escapeHtml((clip.reason || "metadata").slice(0, 100))}</small>
         <div class="row">
           <button type="button" data-preview="${index}">Preview</button>
           <button type="button" data-add="${index}">Add</button>
@@ -964,9 +1128,9 @@ function renderTimeline() {
     item.className = "item";
     item.innerHTML = `
       <div>
-        <strong>Clip ${index + 1} · ${escapeHtml(clip.source)}</strong>
+        <strong>Clip ${index + 1} · ${escapeHtml(clip.editLabel || "beat")} · ${escapeHtml(clip.source)}</strong>
         <small>${escapeHtml(clip.license)}</small>
-        <small>${escapeHtml(clip.pageUrl)}</small>
+        <small>${escapeHtml(clip.reason ? `matched ${clip.reason}` : clip.pageUrl)}</small>
       </div>
       <button type="button" data-remove="${index}">×</button>
     `;
@@ -984,7 +1148,7 @@ function renderTimeline() {
 }
 
 function wrapText(context, text, x, y, width, lineHeight, maxLines) {
-  const words = text.split(" ");
+  const words = clean(text).split(" ");
   let line = "";
   const lines = [];
 
@@ -1002,12 +1166,30 @@ function wrapText(context, text, x, y, width, lineHeight, maxLines) {
   lines.slice(0, maxLines).forEach((entry, index) => {
     context.fillText(entry, x, y + index * lineHeight);
   });
+  return lines.slice(0, maxLines);
 }
 
-function drawVideoFrame(context, video, x, y, width, height) {
+function roundedRect(context, x, y, width, height, radius) {
+  const r = Math.min(radius, width / 2, height / 2);
+  context.beginPath();
+  context.moveTo(x + r, y);
+  context.arcTo(x + width, y, x + width, y + height, r);
+  context.arcTo(x + width, y + height, x, y + height, r);
+  context.arcTo(x, y + height, x, y, r);
+  context.arcTo(x, y, x + width, y, r);
+  context.closePath();
+}
+
+function fillRounded(context, x, y, width, height, radius, fillStyle) {
+  context.fillStyle = fillStyle;
+  roundedRect(context, x, y, width, height, radius);
+  context.fill();
+}
+
+function drawVideoFrame(context, video, x, y, width, height, zoom = 1) {
   const videoWidth = video.videoWidth || 720;
   const videoHeight = video.videoHeight || 1280;
-  const scale = Math.max(width / videoWidth, height / videoHeight);
+  const scale = Math.max(width / videoWidth, height / videoHeight) * zoom;
   const sourceWidth = width / scale;
   const sourceHeight = height / scale;
   context.drawImage(
@@ -1029,10 +1211,150 @@ function loadVideo(url) {
     video.crossOrigin = "anonymous";
     video.muted = true;
     video.playsInline = true;
+    video.preload = "auto";
     video.src = url;
-    video.onloadeddata = () => resolve(video);
+    let settled = false;
+    const finish = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(video);
+    };
+    video.onloadeddata = finish;
+    video.oncanplay = finish;
     video.onerror = reject;
+    setTimeout(() => {
+      if (!settled && video.readyState >= 1) {
+        finish();
+      } else if (!settled) {
+        reject(new Error("Video timed out."));
+      }
+    }, 9000);
+    video.load();
   });
+}
+
+function captionChunks() {
+  const source = clean(state.fact) || voiceoverText();
+  const chunks = source
+    .split(/(?<=[.!?])\s+|,\s+/)
+    .map(clean)
+    .filter(Boolean);
+  if (chunks.length >= 3) {
+    return chunks.slice(0, 7);
+  }
+  const words = source.split(" ").filter(Boolean);
+  const grouped = [];
+  for (let index = 0; index < words.length; index += 8) {
+    grouped.push(words.slice(index, index + 8).join(" "));
+  }
+  return grouped.length ? grouped.slice(0, 7) : ["A quick fact worth watching."];
+}
+
+function captionAt(elapsed, duration) {
+  const chunks = captionChunks();
+  const index = Math.min(chunks.length - 1, Math.floor((elapsed / Math.max(duration, 1)) * chunks.length));
+  return chunks[index] || chunks[0];
+}
+
+function drawPlaceholder(context, elapsed) {
+  const gradient = context.createLinearGradient(0, 0, 720, 1280);
+  gradient.addColorStop(0, "#12311e");
+  gradient.addColorStop(0.5, "#0b1320");
+  gradient.addColorStop(1, "#050505");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, 720, 1280);
+
+  context.save();
+  context.globalAlpha = 0.22;
+  context.strokeStyle = "#18f038";
+  context.lineWidth = 3;
+  for (let x = -260; x < 880; x += 82) {
+    context.beginPath();
+    context.moveTo(x + elapsed * 18, 0);
+    context.lineTo(x + 380 + elapsed * 18, 1280);
+    context.stroke();
+  }
+  context.restore();
+
+  context.fillStyle = "#18f038";
+  context.font = "900 56px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "center";
+  wrapText(context, postTitle(), 360, 620, 610, 62, 3);
+}
+
+function drawActionRail(context) {
+  const actions = [
+    ["<3", "99K"],
+    ["++", "12K"],
+    [">", "Share"],
+    ["+", "Save"],
+  ];
+  context.textAlign = "center";
+  actions.forEach(([icon, label], index) => {
+    const y = 500 + index * 124;
+    fillRounded(context, 626, y - 34, 62, 62, 31, "rgba(0,0,0,.55)");
+    context.fillStyle = "#fff";
+    context.font = "900 27px -apple-system,Segoe UI,sans-serif";
+    context.fillText(icon, 657, y + 7);
+    context.font = "900 18px -apple-system,Segoe UI,sans-serif";
+    context.fillText(label, 657, y + 58);
+  });
+}
+
+function drawShortsOverlay(context, elapsed, duration, activeClip) {
+  const topGradient = context.createLinearGradient(0, 0, 0, 360);
+  topGradient.addColorStop(0, "rgba(0,0,0,.84)");
+  topGradient.addColorStop(1, "rgba(0,0,0,0)");
+  context.fillStyle = topGradient;
+  context.fillRect(0, 0, 720, 360);
+
+  const bottomGradient = context.createLinearGradient(0, 820, 0, 1280);
+  bottomGradient.addColorStop(0, "rgba(0,0,0,0)");
+  bottomGradient.addColorStop(1, "rgba(0,0,0,.9)");
+  context.fillStyle = bottomGradient;
+  context.fillRect(0, 820, 720, 460);
+
+  fillRounded(context, 28, 30, 266, 54, 27, "rgba(0,0,0,.62)");
+  context.fillStyle = "#18f038";
+  context.font = "900 21px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "left";
+  context.fillText("@FactPulse", 50, 65);
+  fillRounded(context, 520, 30, 154, 54, 27, "#fff");
+  context.fillStyle = "#050505";
+  context.font = "900 19px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "center";
+  context.fillText("SUBSCRIBE", 597, 65);
+
+  context.fillStyle = "#18f038";
+  context.font = "1000 58px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "center";
+  context.fillText("DID YOU KNOW?", 360, 150);
+  context.fillStyle = "#fff";
+  context.font = "900 34px -apple-system,Segoe UI,sans-serif";
+  wrapText(context, titleCase(state.subject || "FactPulse"), 360, 198, 620, 40, 2);
+
+  const caption = captionAt(elapsed, duration);
+  fillRounded(context, 42, 888, 570, 172, 24, "rgba(0,0,0,.72)");
+  context.fillStyle = "#fff";
+  context.font = "900 39px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "center";
+  wrapText(context, caption, 327, 938, 510, 43, 3);
+
+  const source = activeClip ? `${activeClip.source} / ${activeClip.match === "exact" ? "exact" : "b-roll"}` : "FactPulse auto edit";
+  fillRounded(context, 42, 1080, 408, 44, 22, "rgba(24,240,56,.94)");
+  context.fillStyle = "#061007";
+  context.font = "900 18px -apple-system,Segoe UI,sans-serif";
+  context.textAlign = "left";
+  context.fillText(source.slice(0, 34), 64, 1108);
+
+  context.fillStyle = "rgba(255,255,255,.2)";
+  context.fillRect(28, 1242, 664, 10);
+  context.fillStyle = "#18f038";
+  context.fillRect(28, 1242, 664 * (elapsed / Math.max(duration, 1)), 10);
+
+  drawActionRail(context);
 }
 
 async function renderVideo() {
@@ -1047,17 +1369,26 @@ async function renderVideo() {
   }
 
   const loadedVideos = [];
-  try {
-    for (const clip of state.timeline) {
-      loadedVideos.push(await loadVideo(clip.videoUrl));
+  const output = $("#videoOut");
+  if (output) {
+    output.innerHTML = '<div class="box">Loading clips and building the edit...</div>';
+  }
+  for (const clip of state.timeline) {
+    try {
+      const video = await loadVideo(clip.videoUrl || clip.previewUrl);
+      loadedVideos.push({ clip, video });
+    } catch (error) {
+      // Bad external files are skipped so one broken source does not kill the render.
     }
-  } catch (error) {
-    // Continue and render with the fallback background.
   }
 
-  const recorder = new MediaRecorder(canvas.captureStream(24), {
-    mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm",
-  });
+  const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+  let recorder;
+  try {
+    recorder = new MediaRecorder(canvas.captureStream(24), { mimeType });
+  } catch (error) {
+    recorder = new MediaRecorder(canvas.captureStream(24));
+  }
   const chunks = [];
   recorder.ondataavailable = (event) => {
     if (event.data.size) {
@@ -1066,53 +1397,35 @@ async function renderVideo() {
   };
 
   const finished = new Promise((resolve) => {
-    recorder.onstop = () => resolve(new Blob(chunks, { type: "video/webm" }));
+    recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType || "video/webm" }));
   });
 
-  recorder.start();
+  recorder.start(500);
   const startedAt = performance.now();
 
   function frame(now) {
     const elapsed = Math.min((now - startedAt) / 1000, duration);
-    const topBand = 430;
-    const bottomBand = 110;
 
-    context.fillStyle = "#050505";
-    context.fillRect(0, 0, 720, 1280);
     if (loadedVideos.length) {
       const clipIndex = Math.min(loadedVideos.length - 1, Math.floor(elapsed / (duration / loadedVideos.length || 1)));
-      const video = loadedVideos[clipIndex];
+      const { clip, video } = loadedVideos[clipIndex];
       try {
-        video.currentTime = elapsed % Math.max(video.duration || 4, 1);
-        drawVideoFrame(context, video, 0, topBand, 720, 1280 - topBand - bottomBand);
+        const slot = duration / loadedVideos.length || duration;
+        const localTime = elapsed - clipIndex * slot;
+        const segment = Math.max(1, Number(clip.clipDuration) || slot);
+        const start = Math.max(0, Number(clip.startTime) || 0);
+        const maxTime = Math.max(0, (video.duration || start + localTime + 1) - 0.25);
+        video.currentTime = Math.min(start + (localTime % segment), maxTime);
+        drawVideoFrame(context, video, 0, 0, 720, 1280, 1.03 + Math.sin(elapsed / 2) * 0.015);
+        drawShortsOverlay(context, elapsed, duration, clip);
       } catch (error) {
-        context.fillStyle = "#1f6fb6";
-        context.fillRect(0, topBand, 720, 1280 - topBand - bottomBand);
+        drawPlaceholder(context, elapsed);
+        drawShortsOverlay(context, elapsed, duration, null);
       }
     } else {
-      context.fillStyle = "#1f6fb6";
-      context.fillRect(0, topBand, 720, 1280 - topBand - bottomBand);
+      drawPlaceholder(context, elapsed);
+      drawShortsOverlay(context, elapsed, duration, null);
     }
-
-    context.fillStyle = "#030303";
-    context.fillRect(0, 0, 720, topBand);
-    context.fillStyle = "#18f038";
-    context.font = "900 56px -apple-system,Segoe UI,sans-serif";
-    context.textAlign = "center";
-    context.fillText("DID YOU KNOW?", 360, 82);
-
-    context.fillStyle = "white";
-    context.font = "900 35px -apple-system,Segoe UI,sans-serif";
-    wrapText(context, clean(state.fact), 360, 137, 660, 39, 7);
-
-    context.fillStyle = "#050505";
-    context.fillRect(0, 1170, 720, 110);
-    context.fillStyle = "white";
-    context.font = "bold 29px -apple-system,Segoe UI,sans-serif";
-    context.textAlign = "left";
-    context.fillText("@FactPulse", 28, 1215);
-    context.font = "bold 25px -apple-system,Segoe UI,sans-serif";
-    context.fillText(postTitle().slice(0, 38), 28, 1256);
 
     const progress = $("#progress");
     if (progress) {
@@ -1122,18 +1435,18 @@ async function renderVideo() {
     if (elapsed < duration) {
       requestAnimationFrame(frame);
     } else {
-      recorder.stop();
+      setTimeout(() => recorder.stop(), 250);
     }
   }
 
   requestAnimationFrame(frame);
   lastRenderedBlob = await finished;
   const url = URL.createObjectURL(lastRenderedBlob);
-  const output = $("#videoOut");
   if (output) {
-    output.innerHTML = `<video controls playsinline src="${url}"></video><a class="btn primary" href="${url}" download="factpulse-short.webm" style="margin-top:10px">Download styled video</a>`;
+    const size = Math.round(lastRenderedBlob.size / 1024);
+    output.innerHTML = `<video controls playsinline src="${url}"></video><a class="btn primary" href="${url}" download="factpulse-short.webm" style="margin-top:10px">Download styled video</a><div class="box" style="margin-top:10px">Preview ready · ${loadedVideos.length} clips · ${size} KB</div>`;
   }
-  toast("Styled video rendered");
+  toast("Shorts-style video rendered");
 }
 
 function editPack() {
@@ -1549,6 +1862,9 @@ function bindEvents() {
   }
   if ($("#searchMany")) {
     $("#searchMany").onclick = () => searchClips(true);
+  }
+  if ($("#autoEdit")) {
+    $("#autoEdit").onclick = autoBuildTimeline;
   }
   if ($("#renderBtn")) {
     $("#renderBtn").onclick = renderVideo;
