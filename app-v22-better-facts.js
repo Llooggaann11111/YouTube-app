@@ -19,109 +19,147 @@
     const key='hookIndex_'+lower(subject).replace(/[^a-z0-9]+/g,'_');
     return hooks[Number(st[key]||0)%hooks.length];
   }
-  function pickProfile(subject,force){
+  function profile(subject,force){
     const s=lower(subject);
     const name=clean(subject)||'this topic';
-    const profiles=[
-      {re:/lady gaga/,scene:'lady gaga red carpet award show shocking fashion cameras performance crowd',hooks:[
-        'Lady Gaga once turned an award show into a horror movie by wearing raw meat on the red carpet. The outfit was fashion, protest, and shock value all at once.',
-        'The wildest Lady Gaga moments work because they feel unsafe at first. The room expects a pop star, then she walks in like a headline nobody prepared for.',
-        'Lady Gaga built fame by making people stare before they even understood the message. That is why one outfit, one stage move, or one silence turns into a viral moment.'
+    const list=[
+      {re:/lady gaga/,scene:'lady gaga red carpet award show fashion performance cameras crowd interview',hooks:[
+        'Lady Gaga did not become unforgettable by only singing. She turned outfits, interviews, and award shows into moments people argued about for years.',
+        'One Lady Gaga entrance can feel like a music video, a protest, and a headline at the same time. That is why cameras never look away.',
+        'Lady Gaga knows the secret of viral fame. Give people something they understand later, but cannot stop staring at now.',
+        'The interesting part about Lady Gaga is how controlled the chaos is. Even the strangest moments usually have a message hiding inside them.',
+        'Lady Gaga proved fame is not only about being liked. Sometimes the moment people cannot explain becomes the moment they remember forever.'
       ]},
-      {re:/judge judy/,scene:'judge judy courtroom judge verdict evidence audience tense legal scene',hooks:[
-        'Judge Judy became famous for the moment a story stops making sense. The scary part is how fast one tiny detail makes someone look guilty in front of millions.',
-        'In Judge Judy’s courtroom, the loudest moment is not yelling. It is the pause right before she catches the lie.',
-        'Judge Judy clips go viral because they feel like a trap closing. Someone walks in with a story, then one question makes the whole thing collapse.'
+      {re:/judge judy/,scene:'judge judy courtroom judge verdict evidence audience legal tense',hooks:[
+        'Judge Judy clips are addictive because the twist is usually small. A date, a receipt, or one answer makes the whole story fall apart.',
+        'The best Judge Judy moments feel like a trap. Someone starts confident, then one question makes the room go silent.',
+        'Judge Judy became famous for cutting through messy stories fast. The interesting part is how often the truth shows up in one tiny detail.',
+        'A courtroom looks formal, but Judge Judy made it feel like a lie detector with an audience.',
+        'The chilling part is not the yelling. It is the second someone realizes their story no longer works.'
       ]},
       {re:/titanic|ship|sinking|ocean liner|iceberg/,scene:'titanic ship ocean liner iceberg freezing water dark night lifeboats disaster',hooks:[
-        'The Titanic horror was not one giant crash. It started as a quiet scrape in the dark, then turned into freezing water, locked panic, and lifeboats that were not enough.',
-        'The scariest Titanic detail is how normal the night looked at first. Music, lights, calm water, then the ocean started taking the ship piece by piece.',
-        'Titanic passengers did not all panic right away. That is what makes it chilling. Some people were still standing on a floating hotel while time was already running out.'
+        'The Titanic was a floating symbol of confidence. That is what makes the story so gripping. It was not supposed to fail, then the ocean proved otherwise.',
+        'The Titanic disaster started with something almost too quiet to fear. A scrape in the dark became one of history’s most unforgettable nights.',
+        'The most haunting Titanic detail is how normal everything looked before it turned. Lights, music, calm water, then time started running out.',
+        'Titanic is interesting because it was not just a shipwreck. It was a test of class, pride, engineering, panic, and survival.',
+        'The ship was called unsinkable by many people around it. That confidence is what makes the ending feel even colder.'
       ]},
       {re:/court|judge|trial|lawyer|lawsuit|crime|prison|jail|verdict|jury/,scene:'courtroom judge jury lawyer verdict tense hearing evidence',hooks:[
-        'A courtroom looks calm until the verdict drops. One sentence decides who goes home and who loses years of their life.',
-        'The scariest thing in court is not the judge’s voice. It is the tiny piece of evidence that changes everything after everyone thought the story was finished.',
-        'Trials feel slow, then one answer flips the room. A witness, a receipt, a camera angle, one detail becomes the whole case.'
+        'Court cases are interesting because the ending can turn on one small thing. A phone record, a receipt, or a witness can rewrite the whole story.',
+        'A courtroom looks calm, but every sentence has weight. One answer can decide money, freedom, reputation, or years of someone’s life.',
+        'The most gripping trials are not loud the whole time. They build slowly, then one piece of evidence changes the room.',
+        'A jury does not need a movie scene to change a life. Sometimes it only needs one detail that finally makes sense.',
+        'The scary part of court is how permanent the final words sound. Guilty. Not guilty. Case dismissed. Everything changes after that.'
       ]},
       {re:/killer|murder|serial|crime scene|missing person|detective/,scene:'crime scene police tape detective dark street evidence',hooks:[
-        'The creepiest crime stories are not solved by huge clues. They break open because of one weird detail nobody noticed at first.',
-        'A crime scene can look silent, but every object is talking. The terrifying part is finding the one clue that points to someone nobody suspected.',
-        'The scary part is not just what happened. It is how long the truth can sit in plain sight before anyone sees it.'
+        'True crime pulls people in because the answer is usually hidden in something ordinary. A route, a message, or a missed camera angle.',
+        'The creepiest crime stories are not always the bloodiest. They are the ones where the truth sat in plain sight and nobody saw it.',
+        'A crime scene is like a puzzle where every object could matter. The disturbing part is realizing which detail everyone ignored.',
+        'The most interesting clue is often the boring one. That is why detectives care about timelines, receipts, and tiny contradictions.',
+        'True crime feels chilling because it proves a normal day can become evidence.'
       ]},
       {re:/celebrity|actor|actress|singer|rapper|artist|famous|red carpet|award show/,scene:'celebrity red carpet flashing cameras stage crowd interview award show',hooks:[
-        'Fame looks glamorous until one moment follows a person forever. One clip, one outfit, one sentence, and millions decide what the story means.',
-        'The red carpet is not just cameras and lights. It is a pressure chamber where every blink, step, and reaction gets saved forever.',
-        'The creepy part of fame is that strangers remember moments the celebrity might want to forget. The internet does not blink.'
+        'Celebrity moments go viral when they feel bigger than the event. One look, one answer, or one mistake can take over the whole internet.',
+        'The interesting thing about fame is how fast a person becomes a symbol. The crowd sees a star, but the camera catches a human moment.',
+        'A red carpet is not only fashion. It is a live test where every pose, pause, and reaction becomes content.',
+        'Fame looks glamorous, but it also means millions of strangers remember moments the person might want to forget.',
+        'The best celebrity clips work because they feel unscripted. For a few seconds, the mask slips and everyone notices.'
       ]},
       {re:/concert|stage|music|performance|tour|microphone/,scene:'concert stage lights screaming crowd microphone performance',hooks:[
-        'A concert looks controlled from the crowd, but one failed cue turns lights, sound, heat, and thousands of people into chaos.',
-        'The stage is built to look perfect. Behind it, one mistake in timing, audio, or crowd movement can ruin the whole night in seconds.',
-        'The scariest part of a live show is the crowd. Thousands of people move as one, and nobody controls what happens if the energy turns.'
+        'A concert looks effortless, but it is controlled chaos. Lights, sound, timing, security, and thousands of people all have to move together.',
+        'The most interesting live performances are the ones where something almost goes wrong, then the artist turns it into the moment everyone remembers.',
+        'A stage is built to look magical. Behind it, every second is planned so the crowd feels like it is happening naturally.',
+        'Live music is risky because nothing can be edited. One cracked note, one fall, or one surprise becomes part of the legend.',
+        'The crowd is the hidden character in every concert. Their reaction can turn a normal performance into history.'
       ]},
       {re:/volcano|eruption|lava|ash/,scene:'volcano lava eruption ash smoke mountain disaster',hooks:[
-        'A volcano can sit quiet for years, then erase the word safe in minutes. The lava is terrifying, but the ash and gas reach people first.',
-        'The chilling part of a volcano is the silence before it breaks open. The mountain looks still, while pressure builds underneath everything.',
-        'Volcanoes do not need to chase anyone. The ash, heat, gas, and mud move fast enough to turn a normal day into an escape story.'
+        'Volcanoes are fascinating because they look like mountains until the planet reminds everyone they are alive.',
+        'Lava gets attention, but ash can travel farther and cause more chaos. That is the part many people forget.',
+        'A volcano can stay quiet for years, then change the land in hours. That mix of beauty and danger is why eruption footage feels unreal.',
+        'The chilling part is the pressure building under a calm surface. The mountain looks still while the ground is preparing to open.',
+        'Volcanoes do not only destroy. They also create new land, which makes them one of nature’s strangest forces.'
       ]},
       {re:/earthquake|hurricane|tornado|tsunami|flood|storm|disaster/,scene:'storm flood tornado earthquake disaster damage emergency',hooks:[
-        'Natural disasters are terrifying because normal life changes before your brain catches up. A street, a house, a school, gone in minutes.',
-        'The scariest disasters do not look real at first. The sky changes, the ground moves, the water rises, and suddenly every second matters.',
-        'The warning is often shorter than the damage. That is what makes disaster footage so hard to look away from.'
+        'Disaster footage is gripping because everything familiar changes fast. A street, a house, or a beach becomes dangerous in minutes.',
+        'The scary part of a storm is not only its size. It is how quickly people realize their normal plan no longer matters.',
+        'A tsunami is not just a big wave. It is moving ocean power, and by the time it looks obvious, it may already be too late.',
+        'Tornadoes look unreal because the sky reaches down and starts choosing what stays and what disappears.',
+        'Natural disasters are interesting because they expose how fragile normal life is. The same place can look safe in the morning and unrecognizable by night.'
       ]},
       {re:/space|rocket|astronaut|planet|moon|mars|nasa|black hole/,scene:'space rocket astronaut planet dark universe stars',hooks:[
-        'Space looks peaceful because there is no sound. That is the terrifying part. No air, no rescue, no quick fix, and every mistake happens in silence.',
-        'The universe is not empty in a comforting way. It is empty in a way that makes one broken part, one leak, or one wrong angle deadly.',
-        'Astronauts train for calm because panic wastes oxygen. That alone tells you how serious space really is.'
+        'Space is fascinating because it is beautiful and hostile at the same time. No air, no sound, no quick rescue.',
+        'A rocket launch looks clean from far away, but it is controlled explosion pointed at the sky.',
+        'The moon looks calm, but every footprint there exists in a place where one broken suit would become an emergency.',
+        'Black holes are interesting because they turn gravity into something almost impossible to picture. Even light does not get to leave.',
+        'Astronauts train to stay calm because panic wastes oxygen. That one detail says everything about space.'
       ]},
       {re:/ocean|shark|whale|deep sea|submarine|sea/,scene:'dark ocean deep sea waves submarine shark water',hooks:[
-        'The ocean gets scarier the deeper you go. Sunlight disappears, pressure crushes metal, and most of the world below is still unknown.',
-        'The deep sea is a place where humans do not belong. The pressure alone is strong enough to turn one weak spot into disaster.',
-        'At the surface, the ocean looks beautiful. Underneath, it is dark, freezing, heavy, and full of things built to survive where we cannot.'
+        'The ocean is interesting because most of it is still mystery. We have maps of planets, but the deep sea still hides things on Earth.',
+        'Deep water is not just dark. It is heavy. The pressure alone can turn one weak spot into disaster.',
+        'The surface looks peaceful, but below it are currents, predators, wrecks, and places sunlight never reaches.',
+        'A submarine clip is tense because the danger is invisible. The water outside does not need to move fast to be deadly.',
+        'The ocean makes humans feel small in a way few places can. That is why even calm water can feel unsettling.'
       ]},
       {re:/animal|lion|tiger|bear|wolf|snake|crocodile|alligator|shark/,scene:'wild animal predator close up nature danger',hooks:[
-        'Predators are scariest when they are quiet. By the time the target realizes it is being watched, the dangerous part already started.',
-        'The wild does not give warnings. One step too close, one wrong turn, one second of panic, and the animal has the advantage.',
-        'Nature looks calm in clips, but predators do not waste movement. The attack often starts before the viewer even notices the danger.'
+        'Predators are interesting because they waste almost nothing. Every pause, stare, and step has a purpose.',
+        'The wild does not work like a movie. The dangerous moments often happen quietly, before anyone realizes the chase started.',
+        'A crocodile can look like a log until the water explodes. That is what makes patience one of nature’s scariest weapons.',
+        'Animals survive with tools humans cannot see right away. Speed, camouflage, smell, silence, and timing all matter.',
+        'The most chilling predator clips are the ones where nothing happens at first. That is usually when the animal is deciding.'
       ]},
       {re:/war|soldier|army|military|battle|weapon|tank/,scene:'soldiers battlefield military smoke historic war footage',hooks:[
-        'War footage feels old until you remember every frame had real people inside it. One order, one mistake, one explosion, and families changed forever.',
-        'The chilling part of war is how fast ordinary people become names in history books. A road, a field, a building, suddenly becomes a battlefield.',
-        'War turns small decisions into permanent consequences. That is why even silent footage feels heavy.'
+        'War footage is interesting because it turns history into real movement. Every frame was once someone’s present moment.',
+        'A battlefield is not only explosions. It is confusion, fear, waiting, and decisions made with almost no time.',
+        'The chilling part of war is how normal places become historic for the worst reasons.',
+        'Military clips can look distant, but every vehicle, road, and building had people attached to it.',
+        'War changes maps, but it also changes families. That is why silent footage can feel heavier than loud footage.'
       ]},
       {re:/money|bank|billionaire|stock|business|scam|fraud|rich/,scene:'money cash bank business office dark finance',hooks:[
-        'Money gets scary when the numbers stop being numbers. One hidden decision can cost people homes, jobs, and futures before they even know it happened.',
-        'A scam does not look like a monster. It looks like trust, paperwork, promises, and a number that feels too good to question.',
-        'The darkest money stories start clean. A signature, a deal, a quiet transfer, then thousands of people pay for it later.'
+        'Money stories get interesting when the numbers stop being abstract. A quiet decision in one room can affect thousands of people outside it.',
+        'A scam usually does not look suspicious at first. It looks like trust, confidence, paperwork, and a promise that feels safe.',
+        'The richest stories are often about timing. Being early, being lucky, or seeing something everyone else ignored.',
+        'Business can look boring until one deal changes a company, a city, or a whole industry.',
+        'The dark side of money is how clean it can look while the damage happens somewhere else.'
       ]},
       {re:/school|student|teacher|college|exam|classroom/,scene:'school hallway classroom students desks quiet tension',hooks:[
-        'A school can look normal while someone is quietly falling apart. That is what makes hallways, rumors, grades, and pressure heavier than they look.',
-        'The scariest school stories rarely start loud. They start with stress, silence, and people missing the warning signs.',
-        'A classroom looks safe, but pressure builds in private. One bad day can turn into the memory someone never forgets.'
+        'School stories hit because everyone understands the pressure. One test, one rumor, or one mistake can feel huge when you are inside it.',
+        'A classroom looks simple, but it can hold stress, competition, fear, friendships, and secrets all at once.',
+        'The interesting part of school is how small moments feel permanent. A hallway conversation can stay in someone’s memory for years.',
+        'Pressure in school is quiet. That is why people miss it until it shows up in a bigger way.',
+        'Every school has two versions. The one adults see, and the one students actually live in.'
       ]},
       {re:/doctor|hospital|medical|disease|virus|surgery|patient/,scene:'hospital doctor emergency room medical monitors patient',hooks:[
-        'Hospitals feel safe until you hear the machines. Every beep means someone is being measured against time.',
-        'The scariest part of medicine is how fast normal can change. One scan, one number, one result, and life splits into before and after.',
-        'Behind every calm hospital hallway, someone is having the worst day of their life. That is why the silence feels so heavy.'
+        'Hospitals are interesting because every calm hallway is connected to someone’s emergency.',
+        'One medical result can split a life into before and after. That is why a single number on a screen can feel terrifying.',
+        'Doctors make fast choices with real consequences. The pressure is hidden behind calm voices and clean rooms.',
+        'The machines in hospitals do not look emotional, but every beep means someone is being watched by time.',
+        'Medicine is full of moments where science, luck, and timing meet in the same room.'
       ]},
       {re:/ai|robot|technology|computer|phone|internet|app|youtube/,scene:'computer screen phone technology dark server data code',hooks:[
-        'Technology gets creepy when it knows your habits better than people do. Every tap teaches the machine what keeps you watching.',
-        'The scary part of the internet is speed. A lie, a leak, or a mistake spreads before anyone has time to pull it back.',
-        'Your phone feels personal, but it is also a window. Every search, pause, click, and scroll leaves a pattern behind.'
+        'Technology is interesting because it feels invisible when it works. Behind one tap are servers, code, signals, and decisions happening fast.',
+        'Your phone learns patterns from tiny choices. Searches, pauses, clicks, and scrolls all turn into a picture of what keeps you watching.',
+        'The internet makes things feel instant, but that speed is also what makes mistakes, leaks, and lies hard to stop.',
+        'AI feels new because it does not only store information. It starts predicting what people might want next.',
+        'The creepy part of apps is how normal tracking feels. The system learns while the user thinks they are just scrolling.'
       ]},
       {re:/building|skyscraper|tower|bridge|burj|construction/,scene:'skyscraper tower glass building height workers city',hooks:[
-        'Skyscrapers look clean from the ground. Up close, they are wind, glass, cables, and workers hanging where one mistake has no second chance.',
-        'The scariest part of a tall building is how normal it looks from below. Hundreds of feet up, even a small job becomes a survival test.',
-        'Every shiny tower hides a dangerous truth. Someone had to build it, clean it, and trust a rope above the city.'
+        'Skyscrapers are interesting because they make danger look clean. Glass, steel, wind, and height all get hidden behind a shiny skyline.',
+        'Every tall building has two stories. The view from the ground, and the workers who trusted ropes, cranes, and balance above the city.',
+        'A bridge looks simple until you think about the weight, weather, movement, and pressure it survives every day.',
+        'The higher a building gets, the more every small job becomes serious. Cleaning one window can turn into a test of nerves.',
+        'Cities look permanent, but every landmark started as a risky idea someone had to build in the air.'
       ]}
     ];
-    const picked=profiles.find(p=>p.re.test(s));
+    const picked=list.find(p=>p.re.test(s));
     if(picked)return {scene:picked.scene,fact:pickOne(subject,picked.hooks,force)};
     const fallback=[
-      'The disturbing part about '+name+' is not the obvious story. It is the small detail that makes everything feel different once you notice it.',
-      name+' looks simple until you follow the details. Then the story gets stranger, darker, and harder to ignore.',
-      'The part people miss about '+name+' is the moment everything turns. Before that, it looks normal. After that, it feels impossible to unsee.'
+      name+' gets interesting when you stop looking at the obvious part and follow the detail most people miss.',
+      'The story behind '+name+' has a turn most people do not expect. At first it looks simple, then the details change the whole thing.',
+      name+' looks ordinary from far away, but the closer you look, the stranger the story gets.',
+      'The part people remember about '+name+' is not always the biggest moment. Sometimes it is the detail that makes everything click.',
+      'What makes '+name+' worth watching is the hidden tension. Something small is usually doing more work than people realize.'
     ];
-    return {scene:name+' close up dramatic footage real event tension b roll',fact:pickOne(subject,fallback,force)};
+    return {scene:name+' close up dramatic footage real event interesting tension b roll',fact:pickOne(subject,fallback,force)};
   }
   function apply(force){
     const subjectInput=document.querySelector('#subject');
@@ -130,19 +168,19 @@
     const detailsInput=document.querySelector('#details');
     const subject=clean(subjectInput&&subjectInput.value);
     if(!subject)return;
-    const p=pickProfile(subject,force);
+    const p=profile(subject,force);
     const st=load();
     st.subject=subject;
     if(force||!clean(factInput&&factInput.value)){st.fact=p.fact;if(factInput)factInput.value=p.fact}
     if(sceneInput){sceneInput.value=p.scene;st.scene=p.scene}
-    if(detailsInput){detailsInput.value='viral hook, chilling tension, real object, no random filler';st.details=detailsInput.value}
-    st.captionStyle='viral_chilling_hook';
+    if(detailsInput){detailsInput.value='viral hook, interesting twist, tension, real object, no random filler';st.details=detailsInput.value}
+    st.captionStyle='viral_interesting_chilling_hook';
     save(st);
-    if(window.toast)try{toast(force?'New hook generated.':'Hook saved.')}catch(e){}
+    if(window.toast)try{toast(force?'New interesting hook generated.':'Hook saved.')}catch(e){}
   }
   function bind(){
     const btn=document.querySelector('#autoFill');
-    if(btn){btn.textContent='Generate better scary hook';btn.onclick=function(e){e.preventDefault();apply(true)}}
+    if(btn){btn.textContent='Generate viral fact hook';btn.onclick=function(e){e.preventDefault();apply(true)}}
     const subject=document.querySelector('#subject');
     const fact=document.querySelector('#fact');
     if(subject&&!subject.dataset.betterFacts){
@@ -156,7 +194,7 @@
       fact.addEventListener('input',function(){const st=load();st.fact=clean(fact.value);save(st)})
     }
   }
-  window.FactPulseBetterFacts={apply,pickProfile};
+  window.FactPulseBetterFacts={apply,pickProfile:profile};
   window.addEventListener('DOMContentLoaded',bind);
   setTimeout(bind,500);
 })();
