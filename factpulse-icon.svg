@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="FactPulse logo">
+  <defs>
+    <linearGradient id="g" x1="70" y1="60" x2="380" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#9cff18"/>
+      <stop offset="1" stop-color="#18f038"/>
+    </linearGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.1 0 0 0 0 1 0 0 0 0 0.2 0 0 0 .8 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="28" y="28" width="456" height="456" rx="102" fill="#101318" stroke="#18f038" stroke-width="10"/>
+  <path d="M173 395c-22 0-39-18-35-39l35-184c10-51 46-79 98-79h119l-18 62H272c-22 0-35 12-39 34l-6 30h113l-16 58H216l-22 118h-21z" fill="url(#g)" filter="url(#glow)"/>
+  <path d="M392 122h39c25 0 45 20 45 45v178c0 25-20 45-45 45H177" fill="none" stroke="#ffffff" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M233 205v112l100-56-100-56z" fill="#7cff18" stroke="#b8ff72" stroke-width="8" stroke-linejoin="round" filter="url(#glow)"/>
+  <path d="M332 263h42l18-48 29 98 20-50h48" fill="none" stroke="#18f038" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+</svg>
