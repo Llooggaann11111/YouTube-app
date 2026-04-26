@@ -14,6 +14,7 @@ let state = {
   mode: "broad",
   pixabay: "",
   pexels: "",
+  resolvedSubject: "",
   clips: [],
   timeline: [],
 };
@@ -58,6 +59,103 @@ const SEARCH_STOP_WORDS = new Set([
   "background",
   "broll",
   "roll",
+]);
+
+const PERSON_WORD_RE =
+  /\b(inventor|scientist|engineer|physicist|chemist|mathematician|artist|writer|president|king|queen|actor|founder|born|died|biography|portrait|professor|activist|athlete|singer|composer|entrepreneur|leader|explorer)\b/;
+
+const KNOWN_PERSON_SUBJECTS = [
+  "Nikola Tesla",
+  "Albert Einstein",
+  "Isaac Newton",
+  "Marie Curie",
+  "Ada Lovelace",
+  "Alan Turing",
+  "Thomas Edison",
+  "Alexander Graham Bell",
+  "Leonardo da Vinci",
+  "Galileo Galilei",
+  "Martin Luther King Jr",
+  "Abraham Lincoln",
+  "George Washington",
+  "Rosa Parks",
+  "Amelia Earhart",
+  "Walt Disney",
+  "Steve Jobs",
+  "Elon Musk",
+  "Michael Jordan",
+  "Cristiano Ronaldo",
+  "Lionel Messi",
+  "Taylor Swift",
+  "Beyonce",
+  "Oprah Winfrey",
+  "Cleopatra",
+  "Julius Caesar",
+  "Napoleon Bonaparte",
+  "Queen Elizabeth II",
+  "Barack Obama",
+  "Joe Biden",
+  "Donald Trump",
+];
+
+const SUBJECT_ALIASES = new Map([
+  ["nikola tasla", "Nikola Tesla"],
+  ["nicola tesla", "Nikola Tesla"],
+  ["nikola telsa", "Nikola Tesla"],
+  ["nikola tesler", "Nikola Tesla"],
+  ["albert einstien", "Albert Einstein"],
+  ["issac newton", "Isaac Newton"],
+  ["marry curie", "Marie Curie"],
+  ["thomas edisonn", "Thomas Edison"],
+]);
+
+const KNOWN_PERSON_PROFILES = new Map([
+  [
+    "nikola tesla",
+    {
+      description: "Serbian-American inventor, electrical engineer, and futurist",
+      fact:
+        "Nikola Tesla was a Serbian-American inventor and electrical engineer known for his work on alternating current power systems. His experiments helped shape modern electricity, motors, radio, and wireless energy ideas.",
+      scene: "inventor laboratory electricity invention machine experiment alternating current",
+      details: "inventor, electricity, alternating current, laboratory, experiment, wireless power, induction motor",
+    },
+  ],
+  [
+    "albert einstein",
+    {
+      description: "theoretical physicist",
+      fact:
+        "Albert Einstein was a theoretical physicist best known for the theory of relativity and the equation E = mc2. His work changed modern physics and helped explain space, time, energy, and gravity.",
+      scene: "physicist chalkboard science equations research lecture",
+      details: "physicist, relativity, equations, science, research, lecture, chalkboard",
+    },
+  ],
+]);
+
+const NON_PERSON_TOPIC_WORDS = new Set([
+  "volcano",
+  "eruption",
+  "earthquake",
+  "storm",
+  "weather",
+  "ocean",
+  "animal",
+  "car",
+  "phone",
+  "telephone",
+  "city",
+  "building",
+  "food",
+  "recipe",
+  "money",
+  "space",
+  "planet",
+  "rocket",
+  "war",
+  "battle",
+  "court",
+  "trial",
+  "case",
 ]);
 
 function clean(value) {
@@ -119,8 +217,84 @@ function titleCase(text) {
     .join(" ");
 }
 
+function compactKey(text) {
+  return keywordList(text).join("");
+}
+
+function editDistance(left, right, max = 4) {
+  const a = String(left || "");
+  const b = String(right || "");
+  if (Math.abs(a.length - b.length) > max) {
+    return max + 1;
+  }
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = Array.from({ length: b.length + 1 }, () => 0);
+
+  for (let row = 1; row <= a.length; row += 1) {
+    current[0] = row;
+    let best = current[0];
+    for (let column = 1; column <= b.length; column += 1) {
+      const cost = a[row - 1] === b[column - 1] ? 0 : 1;
+      current[column] = Math.min(previous[column] + 1, current[column - 1] + 1, previous[column - 1] + cost);
+      best = Math.min(best, current[column]);
+    }
+    if (best > max) {
+      return max + 1;
+    }
+    for (let column = 0; column <= b.length; column += 1) {
+      previous[column] = current[column];
+    }
+  }
+  return previous[b.length];
+}
+
+function bestKnownSubjectMatch(subject) {
+  const typed = clean(subject);
+  const lowered = typed.toLowerCase();
+  if (!typed) {
+    return "";
+  }
+  if (SUBJECT_ALIASES.has(lowered)) {
+    return SUBJECT_ALIASES.get(lowered);
+  }
+
+  const typedTokens = keywordList(typed);
+  if (typedTokens.length < 2) {
+    return "";
+  }
+
+  const typedKey = compactKey(typed);
+  let best = "";
+  let bestDistance = 99;
+  KNOWN_PERSON_SUBJECTS.forEach((candidate) => {
+    const candidateTokens = keywordList(candidate);
+    const candidateKey = compactKey(candidate);
+    const wholeDistance = editDistance(typedKey, candidateKey, 3);
+    const firstMatches = typedTokens[0] === candidateTokens[0] || editDistance(typedTokens[0], candidateTokens[0], 1) <= 1;
+    const lastDistance = editDistance(typedTokens[typedTokens.length - 1], candidateTokens[candidateTokens.length - 1], 2);
+    const distance = Math.min(wholeDistance, firstMatches ? lastDistance : 99);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  });
+
+  return bestDistance <= 2 ? best : "";
+}
+
+function canonicalSubject() {
+  return clean(state.resolvedSubject) || bestKnownSubjectMatch(state.subject) || clean(state.subject);
+}
+
+function looksLikePersonSubject() {
+  const subject = canonicalSubject();
+  const tokens = keywordList(subject);
+  const hasNonPersonWord = tokens.some((token) => NON_PERSON_TOPIC_WORDS.has(token));
+  return tokens.length >= 2 && !hasNonPersonWord && /^[A-Z][a-z]+(?:\s+[A-Z][a-z]+|(?:\s+[A-Z][a-z]+){2,})/.test(titleCase(subject));
+}
+
 function postTitle() {
-  return (titleCase(state.subject || keywordList(state.fact).slice(0, 4).join(" ") || "Fact") + " Fact")
+  return (titleCase(canonicalSubject() || keywordList(state.fact).slice(0, 4).join(" ") || "Fact") + " Fact")
     .toUpperCase()
     .slice(0, 70);
 }
@@ -161,7 +335,7 @@ function mergedKeywords(...values) {
 }
 
 function subjectTokens() {
-  return keywordList(state.subject);
+  return keywordList(canonicalSubject());
 }
 
 function detailTokens() {
@@ -169,7 +343,14 @@ function detailTokens() {
 }
 
 function sceneTokens() {
-  return keywordList(clean(state.scene) || autoSceneText(`${state.subject} ${state.fact}`)).slice(0, 10);
+  const scene = clean(state.scene);
+  if (scene) {
+    return keywordList(scene).slice(0, 10);
+  }
+  if (looksLikePersonSubject() && !clean(state.fact) && !clean(state.details)) {
+    return keywordList("portrait biography documentary archive museum interview laboratory research").slice(0, 10);
+  }
+  return keywordList(autoSceneText(`${canonicalSubject()} ${state.fact}`)).slice(0, 10);
 }
 
 function visualContextTokens() {
@@ -181,17 +362,15 @@ function visualContextTokens() {
 }
 
 function isPersonLikeSubject() {
-  const fact = clean(`${state.subject} ${state.fact} ${state.details}`).toLowerCase();
+  const fact = clean(`${canonicalSubject()} ${state.fact} ${state.details}`).toLowerCase();
   return (
-    subjectTokens().length >= 2 ||
-    /\b(inventor|scientist|engineer|physicist|chemist|mathematician|artist|writer|president|king|queen|actor|founder|born|died)\b/.test(
-      fact
-    )
+    looksLikePersonSubject() ||
+    PERSON_WORD_RE.test(fact)
   );
 }
 
 function forbiddenContextTerms() {
-  const context = new Set(mergedKeywords(state.subject, state.fact, state.scene, state.details));
+  const context = new Set(mergedKeywords(canonicalSubject(), state.subject, state.fact, state.scene, state.details));
   const groups = [
     {
       allow: ["bomb", "war", "weapon", "military", "missile", "explosion", "nuclear", "gun"],
@@ -226,6 +405,10 @@ function forbiddenContextTerms() {
       allow: ["music", "singer", "concert", "song", "album"],
       block: ["lyrics", "karaoke", "cover song", "music video"],
     },
+    {
+      allow: ["telephone", "phone", "smartphone", "cellphone", "mobile", "call", "communication"],
+      block: ["telephone", "phone", "smartphone", "cellphone", "mobile phone", "handset", "dialing", "call center"],
+    },
   ];
 
   const blocked = new Set();
@@ -248,7 +431,7 @@ function urlWords(url) {
 }
 
 function searchQueries() {
-  const subject = clean(state.subject);
+  const subject = canonicalSubject();
   const scenePhrase = sceneTokens().slice(0, 5).join(" ");
   const visualPhrase = visualContextTokens().slice(0, 5).join(" ");
   const detailPhrase = detailTokens().slice(0, 5).join(" ");
@@ -364,6 +547,7 @@ function loadState() {
 
 function syncFromInputs(options = {}) {
   const { write = true, clearClips = false } = options;
+  const previousSubject = clean(state.subject);
   const fieldMap = {
     subject: "subject",
     fact: "fact",
@@ -382,6 +566,9 @@ function syncFromInputs(options = {}) {
     }
   }
 
+  if (clean(state.subject) !== previousSubject && clean(state.subject) !== clean(state.resolvedSubject)) {
+    state.resolvedSubject = "";
+  }
   state.length = Math.min(45, Math.max(25, Number(state.length) || 30));
   if (clearClips) {
     state.clips = [];
@@ -402,7 +589,9 @@ function renderPlan() {
     return;
   }
   const queries = searchQueries();
+  const correction = canonicalSubject() && clean(state.subject) !== canonicalSubject() ? [`Using corrected subject: ${canonicalSubject()}`, ""] : [];
   node.textContent = [
+    ...correction,
     "Exact subject search:",
     ...(queries.exact.length ? queries.exact : ["none"]),
     "",
@@ -460,6 +649,119 @@ function currentYouTubeDescription() {
     .slice(0, 4900);
 }
 
+function sceneMostlySubject(scene, subject) {
+  const sceneWords = keywordList(scene);
+  const subjectWords = new Set(keywordList(subject));
+  return sceneWords.length > 0 && sceneWords.every((word) => subjectWords.has(word));
+}
+
+function shouldAcceptWikiTitle(input, title, summary = {}) {
+  const inputTokens = keywordList(input);
+  const titleTokens = keywordList(title);
+  if (!inputTokens.length || !titleTokens.length) {
+    return false;
+  }
+  const inputKey = inputTokens.join("");
+  const titleKey = titleTokens.join("");
+  const tokenOverlap = inputTokens.filter((token) => titleTokens.some((titleToken) => editDistance(token, titleToken, 2) <= 2));
+  const summaryText = clean(`${summary.title || ""} ${summary.description || ""} ${summary.extract || ""}`).toLowerCase();
+  const personish = inputTokens.length >= 2 || PERSON_WORD_RE.test(summaryText);
+
+  return (
+    personish &&
+    (tokenOverlap.length >= Math.min(2, inputTokens.length) || editDistance(inputKey, titleKey, 4) <= 4)
+  );
+}
+
+async function resolveSubjectWithWikipedia(subject) {
+  const searchResponse = await fetchTimeout(
+    `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
+      subject
+    )}&format=json&origin=*`,
+    {},
+    8000
+  );
+  if (!searchResponse.ok) {
+    return null;
+  }
+  const searchJson = await searchResponse.json();
+  const hits = (searchJson.query && searchJson.query.search) || [];
+  for (const hit of hits.slice(0, 5)) {
+    const summaryResponse = await fetchTimeout(
+      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(hit.title)}`,
+      {},
+      8000
+    );
+    const summaryJson = summaryResponse.ok ? await summaryResponse.json() : {};
+    if (shouldAcceptWikiTitle(subject, hit.title, summaryJson)) {
+      return { title: hit.title, summary: summaryJson };
+    }
+  }
+  return null;
+}
+
+function applyResolvedSubject(title, summaryJson = {}, originalSubject = state.subject) {
+  const previousSubject = clean(originalSubject);
+  const resolvedTitle = clean(title);
+  if (!resolvedTitle) {
+    return false;
+  }
+
+  const changed = resolvedTitle.toLowerCase() !== previousSubject.toLowerCase();
+  const profile = KNOWN_PERSON_PROFILES.get(resolvedTitle.toLowerCase()) || {};
+  const description = clean(summaryJson.description || profile.description || "");
+  const extract = clean(summaryJson.extract || profile.fact || "");
+
+  state.subject = resolvedTitle;
+  state.resolvedSubject = resolvedTitle;
+  if (!clean(state.fact) || changed) {
+    state.fact =
+      extract
+        .split(/(?<=[.!?])\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .join(" ") || profile.fact || `${resolvedTitle} is a person with a biography, timeline, and historical context.`;
+  }
+  if (!clean(state.scene) || changed || sceneMostlySubject(state.scene, previousSubject)) {
+    state.scene = profile.scene || autoSceneText(`${resolvedTitle} ${description} ${state.fact}`);
+  }
+  if (!clean(state.details) || changed) {
+    state.details = profile.details || keywordList(`${resolvedTitle} ${description} ${state.fact}`).slice(0, 8).join(", ");
+  }
+  state.clips = [];
+  state.timeline = [];
+  applyStateToInputs();
+  saveState();
+  syncFromInputs({ write: false });
+  return changed;
+}
+
+async function resolveSubjectBeforeSearch() {
+  const typed = clean(state.subject);
+  if (!typed) {
+    return;
+  }
+
+  const known = bestKnownSubjectMatch(typed);
+  if (known && known.toLowerCase() !== typed.toLowerCase()) {
+    applyResolvedSubject(known, {}, typed);
+    toast(`Corrected subject to ${known}.`);
+  }
+
+  const lookup = canonicalSubject();
+  try {
+    const resolved = await resolveSubjectWithWikipedia(typed);
+    if (resolved && resolved.title) {
+      const changed = applyResolvedSubject(resolved.title, resolved.summary, typed);
+      if (changed || clean(resolved.title).toLowerCase() !== lookup.toLowerCase()) {
+        toast(`Using ${resolved.title}.`);
+      }
+    }
+  } catch (error) {
+    // Offline mode still benefits from local typo aliases and fuzzy scoring.
+  }
+}
+
 async function wikiFill() {
   const subjectField = $("#subject");
   const subject = clean(subjectField ? subjectField.value : state.subject);
@@ -470,35 +772,31 @@ async function wikiFill() {
 
   toast("Getting fact and scene...");
   try {
-    const searchResponse = await fetch(
-      `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(subject)}&format=json&origin=*`
-    );
-    const searchJson = await searchResponse.json();
-    const hit = searchJson.query && searchJson.query.search && searchJson.query.search[0];
-    const pageTitle = hit ? hit.title : subject;
-    const summaryResponse = await fetch(
-      `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(pageTitle)}`
-    );
-    const summaryJson = summaryResponse.ok ? await summaryResponse.json() : {};
-    const extract = clean(summaryJson.extract || subject);
-
-    state.subject = pageTitle;
-    state.fact =
-      extract
-        .split(/(?<=[.!?])\s+/)
-        .filter(Boolean)
-        .slice(0, 2)
-        .join(" ") || `${subject} is a topic with details, timeline, and context.`;
-    state.scene = autoSceneText(`${subject} ${clean(summaryJson.description || "")} ${state.fact}`);
-    state.details = keywordList(`${subject} ${clean(summaryJson.description || "")} ${state.fact}`).slice(0, 6).join(", ");
-    state.clips = [];
-
-    applyStateToInputs();
-    saveState();
-    syncFromInputs({ write: false });
+    const known = bestKnownSubjectMatch(subject);
+    const resolved = await resolveSubjectWithWikipedia(known || subject);
+    if (resolved && resolved.title) {
+      applyResolvedSubject(resolved.title, resolved.summary, subject);
+    } else if (known) {
+      applyResolvedSubject(known, {}, subject);
+    } else {
+      state.resolvedSubject = "";
+      state.fact = `${subject} is a topic with details, timeline, and context.`;
+      state.scene = autoSceneText(`${subject} ${state.fact}`);
+      state.details = keywordList(`${subject} ${state.fact}`).slice(0, 6).join(", ");
+      state.clips = [];
+      applyStateToInputs();
+      saveState();
+      syncFromInputs({ write: false });
+    }
     toast("Auto filled.");
   } catch (error) {
-    toast("Auto fill failed. Type scene words manually.");
+    const known = bestKnownSubjectMatch(subject);
+    if (known) {
+      applyResolvedSubject(known, {}, subject);
+      toast(`Corrected to ${known}.`);
+    } else {
+      toast("Auto fill failed. Type scene words manually.");
+    }
   }
 }
 
@@ -529,8 +827,21 @@ function hasToken(text, token) {
   return new RegExp(`(^|[^a-z0-9])${escapeRegex(token)}([^a-z0-9]|$)`, "i").test(text);
 }
 
-function matchedTokens(tokens, text) {
-  return tokens.filter((token) => hasToken(text, token));
+function textTokens(text) {
+  return keywordList(text);
+}
+
+function hasFuzzyToken(text, token) {
+  if (hasToken(text, token)) {
+    return true;
+  }
+  const limit = token.length >= 7 ? 2 : 1;
+  return textTokens(text).some((word) => Math.abs(word.length - token.length) <= limit && editDistance(word, token, limit) <= limit);
+}
+
+function matchedTokens(tokens, text, options = {}) {
+  const matcher = options.fuzzy ? hasFuzzyToken : hasToken;
+  return tokens.filter((token) => matcher(text, token));
 }
 
 function hasForbiddenTerms(clip) {
@@ -543,13 +854,43 @@ function hasForbiddenTerms(clip) {
 
 function personExactHits(tokens, text) {
   if (tokens.length < 2) {
-    return matchedTokens(tokens, text).length;
+    return matchedTokens(tokens, text, { fuzzy: true }).length;
   }
   const first = tokens[0];
   const last = tokens[tokens.length - 1];
-  const hasFirst = hasToken(text, first);
-  const hasLast = hasToken(text, last);
-  return hasFirst && hasLast ? tokens.length : matchedTokens(tokens, text).length;
+  const hasFirst = hasFuzzyToken(text, first);
+  const hasLast = hasFuzzyToken(text, last);
+  return hasFirst && hasLast ? tokens.length : matchedTokens(tokens, text, { fuzzy: true }).length;
+}
+
+function personAnchorTokens() {
+  return Array.from(
+    new Set([
+      "portrait",
+      "biography",
+      "documentary",
+      "archive",
+      "museum",
+      "interview",
+      "laboratory",
+      "experiment",
+      "research",
+      "inventor",
+      "scientist",
+      "engineer",
+      "physicist",
+      "electricity",
+      "invention",
+      "lecture",
+      "historic",
+      "memorial",
+      "statue",
+      "concert",
+      "stage",
+      "athlete",
+      "stadium",
+    ])
+  );
 }
 
 function subjectMatch(clip) {
@@ -582,10 +923,11 @@ function sceneMatch(clip) {
   }
   const text = clipText(clip);
   const hits = matchedTokens(tokens, text).length;
-  const subjectHits = matchedTokens(subjectTokens(), text).length;
+  const subjectHits = matchedTokens(subjectTokens(), text, { fuzzy: true }).length;
   const detailHits = matchedTokens(detailTokens(), text).length;
   if (isPersonLikeSubject()) {
-    return hits >= Math.min(2, tokens.length) && (subjectHits >= 2 || detailHits >= 2 || hits >= 3);
+    const personContextHits = matchedTokens(personAnchorTokens(), text).length;
+    return hits >= Math.min(2, tokens.length) && (subjectHits >= 2 || detailHits >= 2 || personContextHits >= 2);
   }
   return hits >= Math.min(2, tokens.length);
 }
@@ -593,7 +935,7 @@ function sceneMatch(clip) {
 function clipScore(clip) {
   const text = clipText(clip);
   let score = 0;
-  const subjectHits = matchedTokens(subjectTokens(), text);
+  const subjectHits = matchedTokens(subjectTokens(), text, { fuzzy: true });
   const sceneHits = matchedTokens(sceneTokens(), text);
   const detailHits = matchedTokens(detailTokens(), text);
   const visualHits = matchedTokens(visualContextTokens(), text);
@@ -847,6 +1189,7 @@ async function searchPexels(query, many) {
 
 async function searchClips(many) {
   syncFromInputs();
+  await resolveSubjectBeforeSearch();
   state.clips = [];
   saveState();
   renderClips();
