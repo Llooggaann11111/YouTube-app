@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FactPulse Core Render APIs v28</title>
+<style>
+:root{--bg:#050609;--card:#11141b;--line:#2b313d;--text:#f6f7fb;--muted:#b8bfcc;--green:#18f038;--warn:#ffd166;--blue:#86b7ff;--soft:#1d222c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-weight:750}.app{max-width:1300px;margin:auto;padding:16px 16px 110px}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand p{margin:0;color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}.brand h1{margin:2px 0 0;font-size:28px}.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}.tabs a,.btn,button{border:1px solid var(--line);border-radius:18px;background:var(--soft);color:var(--text);padding:14px 16px;font-weight:1000;text-decoration:none;text-align:center}.tabs .active,.primary{background:var(--green);color:#031007;border-color:var(--green)}.card{background:rgba(17,20,27,.97);border:1px solid var(--line);border-radius:24px;overflow:hidden;margin-bottom:16px}.head{padding:18px;border-bottom:1px solid var(--line)}.head h2{margin:0 0 6px}.head p{margin:0;color:var(--muted);line-height:1.4}.section{padding:18px;display:grid;gap:14px}input,select{width:100%;border:1px solid var(--line);border-radius:16px;background:#070a0f;color:var(--text);padding:15px;font-size:16px;font-weight:800}.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}.src{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:13px;display:grid;gap:8px}.src h3{font-size:16px;margin:0;line-height:1.2}.src p{font-size:13px;margin:0;color:var(--muted);line-height:1.35}.tag{width:max-content;border:1px solid var(--line);background:#101720;border-radius:999px;padding:5px 9px;font-size:12px}.direct{border-color:var(--green);color:var(--green)}.proxy{border-color:var(--warn);color:var(--warn)}.route{border-color:var(--blue);color:var(--blue)}.links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.links a,.links button{border:1px solid var(--line);background:var(--soft);border-radius:14px;color:var(--text);padding:10px;text-decoration:none;text-align:center;font-weight:1000;font-size:13px}.box{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:14px;white-space:pre-wrap;line-height:1.45}.toast{position:fixed;left:18px;right:18px;bottom:18px;background:#020403;border:1px solid var(--line);border-radius:18px;color:var(--green);padding:14px;text-align:center;font-weight:1000;opacity:0;transform:translateY(10px);transition:.2s}.toast.show{opacity:1;transform:translateY(0)}@media(max-width:900px){.three{grid-template-columns:1fr}.tabs{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.brand h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><p>100 core render clients</p><h1>Core Render APIs v28</h1></div><a class="btn primary" href="app-v25.html">All In One</a></header>
+<div class="tabs"><a href="create-v21.html">Create</a><a href="clips-v25.html">Clips</a><a href="render-v25.html">Render</a><a href="source-hub-v27.html">500+ Sources</a><a class="active" href="core-render-apis-v28.html">100 Core</a></div>
+<section class="card"><div class="head"><h2>100 core render sources</h2><p>These are focused on downloadable or render-safe footage, images, audio, archives, and public media. Direct means it is realistic for browser or simple backend use. Proxy means it should go through a backend. Route means search link first.</p></div><div class="section"><div class="three"><input id="q" placeholder="Search subject, example: Titanic, Lady Gaga, volcano"><select id="kind"><option value="all">All render types</option><option value="video">Video</option><option value="image">Image</option><option value="audio">Audio</option><option value="archive">Archive</option><option value="stock">Stock</option><option value="science">Science</option><option value="news">News</option><option value="government">Government</option></select><select id="status"><option value="all">All connection types</option><option value="direct">Direct/API ready</option><option value="proxy">Backend proxy needed</option><option value="route">Search route only</option></select></div><div class="three"><button class="primary" id="saveCore" type="button">Save 100 core sources</button><button class="btn" id="openTop" type="button">Open top 12</button><button class="btn" id="copyNames" type="button">Copy visible names</button></div><div class="box" id="info">Ready.</div></div></section>
+<section class="card"><div class="head"><h2>Core list</h2><p>The app should only auto-call 10 to 20 at once. Use the rest as fallback search routes or backend jobs.</p></div><div class="section"><div class="grid" id="grid"></div></div></section>
+<div class="toast" id="toast">Ready</div>
+</div>
+<script>
+const STORE='factpulse-v16';
+const sources=[
+['Pexels Videos','video stock','direct','Free stock video API with downloadable files','https://www.pexels.com/search/videos/{q}/'],
+['Pixabay Videos','video stock','direct','Free stock video API with downloadable files','https://pixabay.com/videos/search/{q}/'],
+['Internet Archive Movies','video archive','direct','Archive movies and public domain or licensed footage','https://archive.org/search?query={q}&and%5B%5D=mediatype%3A%22movies%22'],
+['Wikimedia Commons Video','video archive','direct','Free licensed video files','https://commons.wikimedia.org/w/index.php?search={q}+filetype%3Avideo'],
+['Library of Congress Film','video archive government','direct','Historic film and video collections','https://www.loc.gov/film-and-videos/?q={q}'],
+['NASA Video Library','video science','direct','Space and science video downloads','https://images.nasa.gov/search-results?q={q}&media=video'],
+['National Archives Catalog','video image archive government','proxy','Government archives and footage','https://catalog.archives.gov/search?q={q}'],
+['DVIDS Video','video government','direct','Military public video and images','https://www.dvidshub.net/search?q={q}&filter%5Btype%5D=video'],
+['Openverse Video/Media','video image audio','direct','Creative Commons media discovery','https://openverse.org/search/?q={q}'],
+['Coverr','video stock','route','Free stock video search','https://coverr.co/search?q={q}'],
+['Mixkit Video','video stock','route','Free stock footage and motion graphics','https://mixkit.co/free-stock-video/{q}/'],
+['Videvo','video stock','route','Free stock video and motion graphics','https://www.videvo.net/search/{q}/'],
+['Vidsplay','video stock','route','Free stock footage search','https://www.vidsplay.com/?s={q}'],
+['Mazwai','video stock','route','Free curated stock footage','https://mazwai.com/search/{q}'],
+['Life of Vids','video stock','route','Free stock video clips','https://www.lifeofvids.com/?s={q}'],
+['Dareful','video stock','route','Free 4K stock videos','https://dareful.com/?s={q}'],
+['Motion Places','video stock','route','Travel and place stock video','https://www.motionplaces.com/?s={q}'],
+['Videezy','video stock','route','Free video background search','https://www.videezy.com/free-video/{q}'],
+['Splitshire Video','video stock','route','Stock videos and images','https://www.splitshire.com/?s={q}'],
+['Clipstill','video stock','route','Cinemagraph and video stock search','https://www.clipstill.com/?s={q}'],
+['Pond5 Public Domain','video audio archive','route','Public domain media search','https://www.pond5.com/free?kw={q}'],
+['AP Archive','video news','route','News and historical video reference','https://www.aparchive.com/search?query={q}'],
+['British Pathe','video news archive','route','Historical newsreel footage','https://www.britishpathe.com/search/query/{q}'],
+['C-SPAN Video','video government news','route','Government and public affairs video','https://www.c-span.org/search/?searchtype=Videos&query={q}'],
+['PBS Video','video news archive','route','Public media video search','https://www.pbs.org/search/?q={q}'],
+['TED Talks','video reference','route','Talks and speeches reference','https://www.ted.com/search?q={q}'],
+['Internet Archive TV News','video news archive','direct','TV news archive reference clips','https://archive.org/details/tv?q={q}'],
+['Europeana Video','video archive','proxy','European archive media search','https://www.europeana.eu/en/search?query={q}&media=true'],
+['DigitalNZ Video','video archive','proxy','New Zealand archive media','https://digitalnz.org/records?search%5Btext%5D={q}'],
+['DPLA Video','video archive','proxy','Digital Public Library media','https://dp.la/search?q={q}'],
+['Smithsonian Media','video image archive','proxy','Museum media and open access search','https://www.si.edu/search/collection-images?edan_q={q}'],
+['USGS Multimedia','video image science','proxy','Earth science media','https://www.usgs.gov/media/images?keywords={q}'],
+['NOAA Media','video image science','route','Weather and ocean media','https://photolib.noaa.gov/Search?searchText={q}'],
+['ESA Multimedia','video image science','route','Space agency media search','https://www.esa.int/esearch?q={q}'],
+['ESO Videos','video image science','route','Astronomy media search','https://www.eso.org/public/search/?q={q}'],
+['Hubble Media','video image science','route','Space images and video','https://hubblesite.org/search?query={q}'],
+['Webb Telescope Media','video image science','route','JWST images and video search','https://webbtelescope.org/search?searchQuery={q}'],
+['NOIRLab Images','image science','route','Astronomy images','https://noirlab.edu/public/images/?search={q}'],
+['NASA APOD','image science','route','Astronomy picture search','https://apod.nasa.gov/cgi-bin/apod/apod_search?tquery={q}'],
+['Pexels Photos','image stock','direct','Free stock photo API','https://www.pexels.com/search/{q}/'],
+['Pixabay Images','image stock','direct','Free image API','https://pixabay.com/images/search/{q}/'],
+['Unsplash','image stock','proxy','Photo API requires key and terms','https://unsplash.com/s/photos/{q}'],
+['StockSnap','image stock','route','Free stock photos','https://stocksnap.io/search/{q}'],
+['Burst Shopify','image stock','route','Free stock photos','https://burst.shopify.com/photos/search?utf8=%E2%9C%93&q={q}'],
+['LibreShot','image stock','route','Free stock photos','https://libreshot.com/?s={q}'],
+['Rawpixel Public Domain','image archive','route','Public domain images','https://www.rawpixel.com/search/{q}?topic=public-domain'],
+['Public Domain Pictures','image archive','route','Public domain image search','https://www.publicdomainpictures.net/en/hledej.php?hleda={q}'],
+['Picryl','image archive','route','Public domain archive image search','https://picryl.com/search?q={q}'],
+['Flickr Commons','image archive','proxy','Commons image collections','https://www.flickr.com/search/?text={q}&license=4%2C5%2C6%2C9%2C10'],
+['British Library Flickr','image archive','route','Public domain archive images','https://www.flickr.com/photos/britishlibrary/search/?text={q}'],
+['NYPL Digital Collections','image archive','proxy','Library image archive','https://digitalcollections.nypl.org/search/index?keywords={q}'],
+['Met Museum Open Access','image archive','direct','Open museum images','https://www.metmuseum.org/art/collection/search?q={q}'],
+['Art Institute Chicago','image archive','direct','Open museum images','https://www.artic.edu/collection?query[term][title]={q}'],
+['Cleveland Museum Art','image archive','direct','Open art collection images','https://www.clevelandart.org/art/collection/search?search={q}'],
+['Harvard Art Museums','image archive','proxy','Museum image collection','https://harvardartmuseums.org/collections?q={q}'],
+['Rijksmuseum','image archive','proxy','Museum image collection','https://www.rijksmuseum.nl/en/search?q={q}'],
+['Getty Collection','image archive','route','Museum image search','https://www.getty.edu/art/collection/search?query={q}'],
+['National Gallery of Art','image archive','route','Open art images','https://www.nga.gov/collection-search-result.html?searchTerm={q}'],
+['Brooklyn Museum','image archive','proxy','Museum open collection','https://www.brooklynmuseum.org/opencollection/search?keyword={q}'],
+['Cooper Hewitt','image archive','proxy','Design museum collection','https://collection.cooperhewitt.org/search/collection?query={q}'],
+['Wellcome Collection','image archive science','proxy','Medical and science images','https://wellcomecollection.org/search?query={q}'],
+['Biodiversity Heritage Library','image archive science','proxy','Historical nature scans and images','https://www.biodiversitylibrary.org/search?searchTerm={q}'],
+['Calisphere','image archive','proxy','California archive images','https://calisphere.org/search/?q={q}'],
+['Digital Commonwealth','image archive','proxy','Massachusetts archive images','https://www.digitalcommonwealth.org/search?search_field=all_fields&q={q}'],
+['Google Arts Culture','image archive','route','Museum image reference','https://artsandculture.google.com/search?q={q}'],
+['MoMA Collection','image archive','route','Modern art search','https://www.moma.org/search?query={q}'],
+['World History Encyclopedia Images','image archive','route','History images and reference','https://www.worldhistory.org/search/?q={q}'],
+['OpenStreetMap Media','image map','route','Location and map reference','https://www.openstreetmap.org/search?query={q}'],
+['Mapillary','image map','route','Street-level reference images','https://www.mapillary.com/app/?q={q}'],
+['Wikimedia Maps','image map archive','route','Map media search','https://commons.wikimedia.org/w/index.php?search={q}+map'],
+['Internet Archive Audio','audio archive','direct','Public domain and licensed audio','https://archive.org/search?query={q}&and%5B%5D=mediatype%3A%22audio%22'],
+['Wikimedia Commons Audio','audio archive','direct','Free licensed audio','https://commons.wikimedia.org/w/index.php?search={q}+filetype%3Aaudio'],
+['Openverse Audio','audio stock','direct','Creative Commons audio search','https://openverse.org/search/audio?q={q}'],
+['Freesound','audio stock','proxy','Sound effects and audio clips','https://freesound.org/search/?q={q}'],
+['Free Music Archive','audio music','route','Free music search','https://freemusicarchive.org/search?quicksearch={q}'],
+['Jamendo','audio music','route','Music search for legal tracks','https://www.jamendo.com/search?qs=q%3D{q}'],
+['ccMixter','audio music','route','Creative Commons music','https://ccmixter.org/search?search_text={q}'],
+['Musopen','audio music','route','Public domain classical music','https://musopen.org/music/?search={q}'],
+['NPR Audio','audio news','route','News audio reference','https://www.npr.org/search?query={q}'],
+['Oyez Audio','audio government','route','Supreme Court audio reference','https://www.oyez.org/search/{q}'],
+['Chronicling America','image archive news government','direct','Historical newspaper scans','https://chroniclingamerica.loc.gov/search/pages/results/?andtext={q}'],
+['Trove Newspapers','image archive news','proxy','Australian newspaper archive','https://trove.nla.gov.au/search?keyword={q}'],
+['UK National Archives','image archive government','route','UK records and images','https://discovery.nationalarchives.gov.uk/results/r?_q={q}'],
+['OpenFEMA Media/Data','image data government','direct','Disaster data and records','https://www.fema.gov/openfema-data-page/search?keys={q}'],
+['NPS Media','image data government','proxy','National parks images and data','https://www.nps.gov/search/?query={q}'],
+['Data.gov Media Datasets','data government','direct','Datasets for fact overlays','https://catalog.data.gov/dataset/?q={q}'],
+['GDELT Media Links','news data','direct','Global news links and context','https://www.gdeltproject.org/gdeltSearch/?query={q}&mode=artlist'],
+['Wikidata Commons Links','data image archive','direct','Entity data and linked media','https://www.wikidata.org/w/index.php?search={q}'],
+['Wikipedia Page Media','image data','direct','Topic images and metadata','https://en.wikipedia.org/w/index.php?search={q}'],
+['Open Library Covers','image archive','direct','Book covers and metadata','https://openlibrary.org/search?q={q}'],
+['Project Gutenberg Media','image text archive','direct','Public domain books and covers','https://www.gutenberg.org/ebooks/search/?query={q}'],
+['Wayback Machine Captures','archive web','direct','Archived pages and old source material','https://web.archive.org/web/*/{q}'],
+['Google News Reference','news reference','route','News reference links','https://news.google.com/search?q={q}'],
+['DuckDuckGo News Reference','news reference','route','News reference search','https://duckduckgo.com/?q={q}&iar=news&ia=news'],
+['BBC Search','video news reference','route','News and video reference','https://www.bbc.co.uk/search?q={q}'],
+['Reuters Pictures','image news reference','route','News image reference','https://pictures.reuters.com/search?query={q}'],
+['Smithsonian Magazine Media','image news science','route','Science and history reference media','https://www.smithsonianmag.com/search/?q={q}'],
+['National Geographic Search','image video science','route','Nature and science reference media','https://www.nationalgeographic.com/search?q={q}'],
+['History.com Video Reference','video history','route','History video reference','https://www.history.com/search?q={q}'],
+['ReliefWeb Media/Data','image data news','direct','Disaster news and records','https://reliefweb.int/search/results?search={q}'],
+['IFRC Disaster Media','image data news','route','Disaster media reference','https://go.ifrc.org/'],
+['GBIF Species Media','image data science','direct','Biodiversity media and data','https://www.gbif.org/search?q={q}'],
+['iNaturalist Observations','image science','proxy','Wildlife observation images','https://www.inaturalist.org/observations?place_id=any&q={q}']
+];
+function clean(v){return String(v||'').trim().replace(/\s+/g,' ')}function enc(v){return encodeURIComponent(clean(v))}function read(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){return{}}}function write(st){localStorage.setItem(STORE,JSON.stringify(st))}function q(){return clean(document.querySelector('#q').value)||clean(read().subject)||'history'}function link(t){return t.replaceAll('{q}',enc(q()))}function toast(m){const t=document.querySelector('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+let visible=[];
+function render(){const kind=document.querySelector('#kind').value,status=document.querySelector('#status').value;visible=sources.filter(s=>(kind==='all'||s[1].includes(kind))&&(status==='all'||s[2]===status));const grid=document.querySelector('#grid');grid.innerHTML='';visible.forEach((s,i)=>{const card=document.createElement('article');card.className='src';card.innerHTML='<span class="tag '+s[2]+'">'+s[2]+'</span><h3>'+(i+1)+'. '+s[0]+'</h3><p>'+s[3]+'</p><p>'+s[1]+'</p><div class="links"><a target="_blank" href="'+link(s[4])+'">Search</a><button type="button" data-name="'+s[0]+'">Use</button></div>';grid.appendChild(card)});document.querySelector('#info').textContent=sources.length+' core render clients loaded. '+visible.length+' visible. Query: '+q()}
+document.querySelector('#saveCore').onclick=()=>{const st=read();st.subject=q();st.coreRenderApis=sources.map(s=>({name:s[0],types:s[1],status:s[2],url:s[4]}));st.coreRenderApiCount=sources.length;write(st);toast('Saved 100 core render clients for the app.')}
+document.querySelector('#openTop').onclick=()=>{visible.slice(0,12).forEach((s,i)=>setTimeout(()=>window.open(link(s[4]),'_blank'),i*160));toast('Opening top 12 visible sources.')}
+document.querySelector('#copyNames').onclick=async()=>{const text=visible.map(s=>s[0]).join('\n');try{await navigator.clipboard.writeText(text);toast('Copied names.')}catch(e){toast('Copy blocked.')}}
+document.querySelector('#kind').onchange=render;document.querySelector('#status').onchange=render;document.querySelector('#q').oninput=render;document.addEventListener('click',e=>{const b=e.target.closest('[data-name]');if(!b)return;const st=read();st.subject=q();st.preferredCoreRenderApi=b.dataset.name;write(st);toast('Saved '+b.dataset.name+'.')});document.querySelector('#q').value=clean(read().subject)||'';render();
+</script>
+</body>
+</html>
