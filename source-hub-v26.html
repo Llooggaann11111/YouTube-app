@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FactPulse Source Hub v26</title>
+<style>
+:root{--bg:#050609;--card:#11141b;--line:#2b313d;--text:#f6f7fb;--muted:#b8bfcc;--green:#18f038;--warn:#ffd166;--bad:#ff4d5d;--soft:#1d222c}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-weight:750}.app{max-width:1200px;margin:auto;padding:16px 16px 100px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand p{margin:0;color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}.brand h1{margin:2px 0 0;font-size:28px}.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}.tabs a,.btn,button{border:1px solid var(--line);border-radius:18px;background:var(--soft);color:var(--text);padding:14px 16px;font-weight:1000;text-decoration:none;text-align:center}.tabs .active,.primary{background:var(--green);color:#031007;border-color:var(--green)}.card{background:rgba(17,20,27,.97);border:1px solid var(--line);border-radius:24px;overflow:hidden;margin-bottom:16px}.head{padding:18px;border-bottom:1px solid var(--line)}.head h2{margin:0 0 6px}.head p{margin:0;color:var(--muted);line-height:1.4}.section{padding:18px;display:grid;gap:14px}input,select{width:100%;border:1px solid var(--line);border-radius:16px;background:#070a0f;color:var(--text);padding:15px;font-size:16px;font-weight:800}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.source{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:13px;display:grid;gap:8px}.source h3{margin:0;font-size:16px}.source p{margin:0;color:var(--muted);line-height:1.35;font-size:13px}.tag{display:inline-flex;width:max-content;border:1px solid var(--line);background:#101720;border-radius:999px;padding:5px 9px;font-size:12px}.tag.render{border-color:var(--green);color:var(--green)}.tag.ref{border-color:var(--warn);color:var(--warn)}.tag.data{border-color:#86b7ff;color:#86b7ff}.links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.links a{border:1px solid var(--line);background:var(--soft);border-radius:14px;color:var(--text);padding:10px;text-decoration:none;text-align:center;font-weight:1000;font-size:13px}.box{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:14px;white-space:pre-wrap;line-height:1.45}.toast{position:fixed;left:18px;right:18px;bottom:18px;background:#020403;border:1px solid var(--line);border-radius:18px;color:var(--green);padding:14px;text-align:center;font-weight:1000;opacity:0;transform:translateY(10px);transition:.2s}.toast.show{opacity:1;transform:translateY(0)}@media(max-width:800px){.two{grid-template-columns:1fr}.tabs{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><p>50 plus source clients</p><h1>Source Hub v26</h1></div><a class="btn primary" href="app-v26.html">All In One</a></header>
+<div class="tabs"><a href="create-v21.html">Create</a><a href="clips-v25.html">Clips</a><a href="render-v25.html">Render</a><a class="active" href="source-hub-v26.html">Sources</a></div>
+<section class="card"><div class="head"><h2>Search more free sources</h2><p>These sources help the app find render-safe media, reference clips, facts, captions, archives, images, audio, and public records.</p></div><div class="section"><div class="two"><input id="q" placeholder="Search subject, example: Titanic, Lady Gaga, space, volcano"><select id="kind"><option value="all">All source types</option><option value="render">Renderable media</option><option value="reference">Reference media</option><option value="data">Facts and data</option><option value="audio">Audio and music</option><option value="image">Images</option><option value="archive">Archives</option></select></div><div class="two"><button class="primary" id="saveQuery" type="button">Save query for app</button><button class="btn" id="openTop" type="button">Open top sources</button></div><div class="box" id="status">Ready. Pick a subject to generate source links.</div></div></section>
+<section class="card"><div class="head"><h2>Added source clients</h2><p>Green sources are best for render-safe downloads. Yellow sources work best as reference or research.</p></div><div class="section"><div class="grid" id="grid"></div></div></section>
+<div class="toast" id="toast">Ready</div>
+</div>
+<script>
+const STORE='factpulse-v16';
+const sources=[
+{name:'Openverse',type:'render image audio',tag:'render',about:'Creative Commons image and audio search.',url:q=>'https://openverse.org/search/?q='+e(q)},
+{name:'Internet Archive',type:'render archive video audio',tag:'render',about:'Public domain and licensed movies, audio, scans, old footage.',url:q=>'https://archive.org/search?query='+e(q)+'&and%5B%5D=mediatype%3A%22movies%22'},
+{name:'Wikimedia Commons',type:'render archive video image audio',tag:'render',about:'Free licensed media files including videos and audio.',url:q=>'https://commons.wikimedia.org/w/index.php?search='+e(q)+'+filetype%3Avideo'},
+{name:'Library of Congress',type:'render archive video image',tag:'render',about:'Historic film, photos, maps, newspapers, and recordings.',url:q=>'https://www.loc.gov/film-and-videos/?q='+e(q)},
+{name:'NASA Image and Video Library',type:'render video image archive science',tag:'render',about:'Space, rockets, Earth, planets, astronauts, and science footage.',url:q=>'https://images.nasa.gov/search-results?q='+e(q)+'&media=video'},
+{name:'National Archives Catalog',type:'render archive video image government',tag:'render',about:'Government records, historic footage, photos, and public records.',url:q=>'https://catalog.archives.gov/search?q='+e(q)},
+{name:'DVIDS',type:'render archive video military government',tag:'render',about:'Military public affairs videos and images.',url:q=>'https://www.dvidshub.net/search?q='+e(q)+'&view=grid'},
+{name:'Pexels Videos',type:'render video stock',tag:'render',about:'Free stock video API and downloadable video files.',url:q=>'https://www.pexels.com/search/videos/'+e(q)+'/'},
+{name:'Pixabay Videos',type:'render video stock',tag:'render',about:'Free stock video API and downloadable clips.',url:q=>'https://pixabay.com/videos/search/'+e(q)+'/'},
+{name:'Coverr',type:'render video stock',tag:'render',about:'Free stock video source for backgrounds.',url:q=>'https://coverr.co/search?q='+e(q)},
+{name:'Mixkit Video',type:'render video stock',tag:'render',about:'Free stock video clips and backgrounds.',url:q=>'https://mixkit.co/free-stock-video/'+e(q)+'/'},
+{name:'Videvo Free Stock',type:'render video stock',tag:'render',about:'Free video and motion graphics search.',url:q=>'https://www.videvo.net/search/'+e(q)+'/'},
+{name:'Flickr Commons',type:'image archive reference',tag:'reference',about:'Public photo collections from archives and museums.',url:q=>'https://www.flickr.com/search/?text='+e(q)+'&license=4%2C5%2C6%2C9%2C10'},
+{name:'Flickr API Search',type:'image reference',tag:'reference',about:'Image search source for visual reference.',url:q=>'https://www.flickr.com/search/?text='+e(q)},
+{name:'Europeana',type:'archive image video audio data',tag:'reference',about:'European museums, archives, photos, films, and records.',url:q=>'https://www.europeana.eu/en/search?query='+e(q)},
+{name:'DPLA',type:'archive image video audio data',tag:'reference',about:'Digital Public Library of America collections.',url:q=>'https://dp.la/search?q='+e(q)},
+{name:'Smithsonian Open Access',type:'archive image data',tag:'reference',about:'Museum records and open access images.',url:q=>'https://www.si.edu/search/collection-images?edan_q='+e(q)},
+{name:'DigitalNZ',type:'archive image video audio data',tag:'reference',about:'New Zealand cultural collections, images, audio, and videos.',url:q=>'https://digitalnz.org/records?search%5Btext%5D='+e(q)},
+{name:'Trove Australia',type:'archive image newspaper data',tag:'reference',about:'Australian newspapers, photos, maps, and archives.',url:q=>'https://trove.nla.gov.au/search?keyword='+e(q)},
+{name:'UK National Archives Discovery',type:'archive data image',tag:'reference',about:'UK government and history records.',url:q=>'https://discovery.nationalarchives.gov.uk/results/r?_q='+e(q)},
+{name:'British Library Flickr',type:'archive image',tag:'reference',about:'Public domain archive images.',url:q=>'https://www.flickr.com/photos/britishlibrary/search/?text='+e(q)},
+{name:'Wellcome Collection',type:'archive image data',tag:'reference',about:'Medical history, science, and culture collections.',url:q=>'https://wellcomecollection.org/search?query='+e(q)},
+{name:'Met Museum API',type:'image data museum',tag:'data',about:'Open museum objects and public domain images.',url:q=>'https://www.metmuseum.org/art/collection/search?q='+e(q)},
+{name:'Art Institute of Chicago API',type:'image data museum',tag:'data',about:'Open access art and object records.',url:q=>'https://www.artic.edu/collection?query[term][title]='+e(q)},
+{name:'Cleveland Museum of Art API',type:'image data museum',tag:'data',about:'Open access museum image records.',url:q=>'https://www.clevelandart.org/art/collection/search?search='+e(q)},
+{name:'Harvard Art Museums API',type:'image data museum',tag:'data',about:'Museum object data and images.',url:q=>'https://harvardartmuseums.org/collections?q='+e(q)},
+{name:'Rijksmuseum API',type:'image data museum',tag:'data',about:'Open museum image records.',url:q=>'https://www.rijksmuseum.nl/en/search?q='+e(q)},
+{name:'Getty Search Gateway',type:'image data museum',tag:'data',about:'Museum collection search reference.',url:q=>'https://www.getty.edu/art/collection/search?query='+e(q)},
+{name:'NYPL Digital Collections',type:'archive image data',tag:'reference',about:'New York Public Library images and records.',url:q=>'https://digitalcollections.nypl.org/search/index?keywords='+e(q)},
+{name:'Biodiversity Heritage Library',type:'archive image data science',tag:'reference',about:'Historical science scans and images.',url:q=>'https://www.biodiversitylibrary.org/search?searchTerm='+e(q)},
+{name:'USGS Multimedia Gallery',type:'image video data science',tag:'reference',about:'Earthquakes, volcanoes, maps, land, and science media.',url:q=>'https://www.usgs.gov/media/images?keywords='+e(q)},
+{name:'NOAA Photo Library',type:'image video data science',tag:'reference',about:'Weather, ocean, climate, storm, and science media.',url:q=>'https://photolib.noaa.gov/Search?searchText='+e(q)},
+{name:'NPS API',type:'image data parks',tag:'data',about:'National parks facts, images, places, and events.',url:q=>'https://www.nps.gov/search/?query='+e(q)},
+{name:'Data.gov Catalog',type:'data government',tag:'data',about:'US government datasets and public records.',url:q=>'https://catalog.data.gov/dataset/?q='+e(q)},
+{name:'Federal Register API',type:'data government',tag:'data',about:'US rules, notices, agencies, and official records.',url:q=>'https://www.federalregister.gov/documents/search?conditions%5Bterm%5D='+e(q)},
+{name:'Congress.gov API Search',type:'data government',tag:'data',about:'Bills, members, hearings, and congressional records.',url:q=>'https://www.congress.gov/search?q='+e(q)},
+{name:'GovInfo',type:'data government archive',tag:'data',about:'Official US government publications.',url:q=>'https://www.govinfo.gov/app/search/%7B%22query%22%3A%22'+e(q)+'%22%7D'},
+{name:'FBI Crime Data API',type:'data crime',tag:'data',about:'Crime and justice data for captions and facts.',url:q=>'https://cde.ucr.cjis.gov/LATEST/webapp/#/pages/explorer/crime/crime-trend'},
+{name:'OpenFEMA API',type:'data disaster government',tag:'data',about:'Disaster declarations and emergency data.',url:q=>'https://www.fema.gov/openfema-data-page/search?keys='+e(q)},
+{name:'World Bank API',type:'data global',tag:'data',about:'Global facts, countries, and development data.',url:q=>'https://data.worldbank.org/search?qterm='+e(q)},
+{name:'REST Countries API',type:'data geography',tag:'data',about:'Country facts and visual context.',url:q=>'https://restcountries.com/v3.1/name/'+e(q)},
+{name:'OpenStreetMap Nominatim',type:'data maps',tag:'data',about:'Places and location context.',url:q=>'https://www.openstreetmap.org/search?query='+e(q)},
+{name:'GeoNames',type:'data maps',tag:'data',about:'Location and geographic facts.',url:q=>'https://www.geonames.org/search.html?q='+e(q)},
+{name:'GDELT Project',type:'data news reference',tag:'data',about:'Global news and event data.',url:q=>'https://www.gdeltproject.org/gdeltSearch/?query='+e(q)+'&mode=artlist'},
+{name:'MediaWiki API',type:'data facts',tag:'data',about:'Wikipedia-style topic research.',url:q=>'https://en.wikipedia.org/w/index.php?search='+e(q)},
+{name:'Wikidata API',type:'data facts',tag:'data',about:'Structured topic facts and entity data.',url:q=>'https://www.wikidata.org/w/index.php?search='+e(q)},
+{name:'Wikinews',type:'data news',tag:'data',about:'Free news reference source.',url:q=>'https://en.wikinews.org/w/index.php?search='+e(q)},
+{name:'Open Library API',type:'data books archive',tag:'data',about:'Book, author, and historical source data.',url:q=>'https://openlibrary.org/search?q='+e(q)},
+{name:'Crossref API',type:'data papers',tag:'data',about:'Research paper metadata.',url:q=>'https://search.crossref.org/?q='+e(q)},
+{name:'Semantic Scholar API',type:'data papers',tag:'data',about:'Research paper metadata and summaries.',url:q=>'https://www.semanticscholar.org/search?q='+e(q)},
+{name:'arXiv API',type:'data papers science',tag:'data',about:'Science and technology paper search.',url:q=>'https://arxiv.org/search/?query='+e(q)+'&searchtype=all'},
+{name:'Freesound',type:'audio music sound',tag:'audio',about:'Creative Commons sound effects and audio.',url:q=>'https://freesound.org/search/?q='+e(q)},
+{name:'Jamendo',type:'audio music',tag:'audio',about:'Music search for legal audio ideas.',url:q=>'https://www.jamendo.com/search?qs=q%3D'+e(q)},
+{name:'Free Music Archive',type:'audio music',tag:'audio',about:'Free music library for legal music ideas.',url:q=>'https://freemusicarchive.org/search?quicksearch='+e(q)},
+{name:'Internet Archive Audio',type:'audio music archive',tag:'audio',about:'Public domain and licensed audio.',url:q=>'https://archive.org/search?query='+e(q)+'&and%5B%5D=mediatype%3A%22audio%22'},
+{name:'Wikimedia Audio',type:'audio archive',tag:'audio',about:'Free licensed audio files.',url:q=>'https://commons.wikimedia.org/w/index.php?search='+e(q)+'+filetype%3Aaudio'},
+{name:'YouTube Data API',type:'reference video',tag:'reference',about:'Best exact reference for celebrity scenes. Not downloadable.',url:q=>'https://www.youtube.com/results?search_query='+e(q)},
+{name:'Vimeo Search',type:'reference video',tag:'reference',about:'Video reference source. Download depends on creator settings.',url:q=>'https://vimeo.com/search?q='+e(q)}
+];
+function e(x){return encodeURIComponent(clean(x))}
+function toast(m){const t=document.querySelector('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function read(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){return{}}}
+function write(st){localStorage.setItem(STORE,JSON.stringify(st))}
+function q(){return clean(document.querySelector('#q').value)||clean(read().subject)||'history'}
+function render(){const grid=document.querySelector('#grid');const filter=document.querySelector('#kind').value;grid.innerHTML='';sources.filter(s=>filter==='all'||s.type.includes(filter)||s.tag===filter).forEach(s=>{const a=s.url(q());const card=document.createElement('article');card.className='source';card.innerHTML='<span class="tag '+(s.tag==='render'?'render':s.tag==='data'?'data':'ref')+'">'+s.tag+'</span><h3>'+s.name+'</h3><p>'+s.about+'</p><div class="links"><a href="'+a+'" target="_blank">Search</a><button type="button" data-name="'+s.name+'">Use</button></div>';grid.appendChild(card)});document.querySelector('#status').textContent=sources.length+' source clients loaded. Query: '+q()}
+document.querySelector('#saveQuery').onclick=()=>{const st=read();st.subject=q();st.extraSources=sources.map(x=>x.name);write(st);toast('Saved query and source list for the app.')}
+document.querySelector('#openTop').onclick=()=>{const list=sources.filter(s=>s.tag==='render').slice(0,8);list.forEach((s,i)=>setTimeout(()=>window.open(s.url(q()),'_blank'),i*180));toast('Opening top render-safe sources.')}
+document.querySelector('#kind').onchange=render;document.querySelector('#q').oninput=render;document.addEventListener('click',e=>{const b=e.target.closest('[data-name]');if(!b)return;const st=read();st.subject=q();st.preferredSource=b.dataset.name;write(st);toast('Saved '+b.dataset.name+' as preferred source.')});document.querySelector('#q').value=clean(read().subject)||'';render();
+</script>
+</body>
+</html>
