@@ -16,10 +16,10 @@ body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%)
 <body>
 <div class="app">
 <header class="top">
-  <div class="brand"><div class="logo">F</div><div><p>default v28 studio</p><h1>FactPulse v28</h1></div></div>
-  <a class="pill" href="create-v21.html">Create</a>
+  <div class="brand"><div class="logo">F</div><div><p>locked v28 studio</p><h1>FactPulse v28</h1></div></div>
+  <a class="pill" href="create-v21.html?v=28">Create</a>
 </header>
-<div class="notice">This is the locked v28 hub. Clips, Render, and the 100 Core Render APIs stay together here.</div>
+<div class="notice">This is the locked v28 hub. Everything stays inside v28. The clip and render engines are the working v25 engines, wrapped and locked here as v28.</div>
 <div class="tabs">
   <button class="active" id="showAll" type="button">All</button>
   <button id="showClips" type="button">Clips</button>
@@ -29,16 +29,16 @@ body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%)
 </div>
 <main class="layout" id="layout">
   <section class="panel" id="clipsPanel">
-    <div class="head"><div><h2>Clips v25</h2><p>Search, preview, YouTube reference, and Use Clip.</p></div><a class="open" href="clips-v25.html" target="_blank">Open</a></div>
-    <div class="frame-wrap"><iframe id="clipsFrame" src="clips-v25.html" title="Clips v25"></iframe></div>
+    <div class="head"><div><h2>Clips v28</h2><p>Search, preview, YouTube reference, and Use Clip.</p></div><a class="open" href="clips-v28.html" target="_blank">Open</a></div>
+    <div class="frame-wrap"><iframe id="clipsFrame" src="clips-v25.html?v=28&locked=1" title="Clips v28"></iframe></div>
   </section>
   <section class="panel" id="renderPanel">
-    <div class="head"><div><h2>Render v25</h2><p>Did You Know or Clips Only + Captions.</p></div><a class="open" href="render-v25.html" target="_blank">Open</a></div>
-    <div class="frame-wrap"><iframe id="renderFrame" src="render-v25.html" title="Render v25"></iframe></div>
+    <div class="head"><div><h2>Render v28</h2><p>Did You Know or Clips Only + Captions.</p></div><a class="open" href="render-v28.html" target="_blank">Open</a></div>
+    <div class="frame-wrap"><iframe id="renderFrame" src="render-v25.html?v=28&locked=1" title="Render v28"></iframe></div>
   </section>
   <section class="panel" id="corePanel">
     <div class="head"><div><h2>100 Core APIs v28</h2><p>Render-safe source clients and routes.</p></div><a class="open" href="core-render-apis-v28.html" target="_blank">Open</a></div>
-    <div class="frame-wrap"><iframe id="coreFrame" src="core-render-apis-v28.html" title="Core Render APIs v28"></iframe></div>
+    <div class="frame-wrap"><iframe id="coreFrame" src="core-render-apis-v28.html?v=28" title="Core Render APIs v28"></iframe></div>
   </section>
 </main>
 <nav class="bottom">
@@ -49,7 +49,7 @@ body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%)
 </div>
 <script>
 function $(x){return document.querySelector(x)}
-function reloadRender(){const f=$('#renderFrame');f.src='render-v25.html?reload='+(Date.now())}
+function reloadRender(){const f=$('#renderFrame');f.src='render-v25.html?v=28&locked=1&reload='+(Date.now())}
 function setView(v){
   const clips=$('#clipsPanel'),render=$('#renderPanel'),core=$('#corePanel');
   $('#showAll').classList.toggle('active',v==='all');
