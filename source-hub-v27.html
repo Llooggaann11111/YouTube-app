@@ -1,0 +1,293 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FactPulse Source Hub v27</title>
+<style>
+:root{--bg:#050609;--card:#11141b;--line:#2b313d;--text:#f6f7fb;--muted:#b8bfcc;--green:#18f038;--warn:#ffd166;--bad:#ff4d5d;--soft:#1d222c;--blue:#86b7ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;font-weight:750}.app{max-width:1300px;margin:auto;padding:16px 16px 100px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}.brand p{margin:0;color:var(--muted);font-size:12px;letter-spacing:.12em;text-transform:uppercase}.brand h1{margin:2px 0 0;font-size:28px}.tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:14px 0}.tabs a,.btn,button{border:1px solid var(--line);border-radius:18px;background:var(--soft);color:var(--text);padding:14px 16px;font-weight:1000;text-decoration:none;text-align:center}.tabs .active,.primary{background:var(--green);color:#031007;border-color:var(--green)}.card{background:rgba(17,20,27,.97);border:1px solid var(--line);border-radius:24px;overflow:hidden;margin-bottom:16px}.head{padding:18px;border-bottom:1px solid var(--line)}.head h2{margin:0 0 6px}.head p{margin:0;color:var(--muted);line-height:1.4}.section{padding:18px;display:grid;gap:14px}input,select{width:100%;border:1px solid var(--line);border-radius:16px;background:#070a0f;color:var(--text);padding:15px;font-size:16px;font-weight:800}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:12px}.source{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:13px;display:grid;gap:8px}.source h3{margin:0;font-size:16px;line-height:1.2}.source p{margin:0;color:var(--muted);line-height:1.35;font-size:13px}.tag{display:inline-flex;width:max-content;border:1px solid var(--line);background:#101720;border-radius:999px;padding:5px 9px;font-size:12px}.tag.render{border-color:var(--green);color:var(--green)}.tag.ref{border-color:var(--warn);color:var(--warn)}.tag.data{border-color:var(--blue);color:var(--blue)}.tag.audio{border-color:#caa6ff;color:#caa6ff}.links{display:grid;grid-template-columns:1fr 1fr;gap:8px}.links a,.links button{border:1px solid var(--line);background:var(--soft);border-radius:14px;color:var(--text);padding:10px;text-decoration:none;text-align:center;font-weight:1000;font-size:13px}.box{background:#070a0f;border:1px solid var(--line);border-radius:18px;padding:14px;white-space:pre-wrap;line-height:1.45}.toast{position:fixed;left:18px;right:18px;bottom:18px;background:#020403;border:1px solid var(--line);border-radius:18px;color:var(--green);padding:14px;text-align:center;font-weight:1000;opacity:0;transform:translateY(10px);transition:.2s}.toast.show{opacity:1;transform:translateY(0)}@media(max-width:860px){.two,.three{grid-template-columns:1fr}.tabs{grid-template-columns:1fr 1fr}.grid{grid-template-columns:1fr}.top{align-items:flex-start}.brand h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top"><div class="brand"><p>500 plus source routes</p><h1>Source Hub v27</h1></div><a class="btn primary" href="app-v25.html">All In One</a></header>
+<div class="tabs"><a href="create-v21.html">Create</a><a href="clips-v25.html">Clips</a><a href="render-v25.html">Render</a><a href="source-hub-v26.html">Sources v26</a><a class="active" href="source-hub-v27.html">500+ Sources</a></div>
+<section class="card"><div class="head"><h2>500 plus search routes</h2><p>This hub expands source discovery. It creates hundreds of routes across archives, media libraries, museum collections, science databases, news archives, audio libraries, government records, and stock sites.</p></div><div class="section"><div class="three"><input id="q" placeholder="Search subject, example: Titanic, Lady Gaga, space, volcano"><select id="kind"><option value="all">All types</option><option value="render">Renderable media</option><option value="reference">Reference media</option><option value="data">Facts and data</option><option value="audio">Audio and music</option><option value="image">Images</option><option value="archive">Archives</option><option value="news">News</option><option value="science">Science</option><option value="government">Government</option></select><select id="mode"><option value="all">All search modes</option><option value="video">Video routes</option><option value="image">Image routes</option><option value="audio">Audio routes</option><option value="facts">Fact routes</option><option value="download">Download focused</option></select></div><div class="three"><button class="primary" id="saveQuery" type="button">Save query for app</button><button class="btn" id="openTop" type="button">Open top 10 render routes</button><button class="btn" id="copyList" type="button">Copy visible route names</button></div><div class="box" id="status">Ready.</div></div></section>
+<section class="card"><div class="head"><h2>Routes</h2><p>Green routes are best for render-safe clips. Yellow routes are better for exact reference and research.</p></div><div class="section"><div class="grid" id="grid"></div></div></section>
+<div class="toast" id="toast">Ready</div>
+</div>
+<script>
+const STORE='factpulse-v16';
+const baseSources=[
+{name:'Openverse',tag:'render',type:'render image audio archive',base:'https://openverse.org/search/?q={q}'},
+{name:'Internet Archive Movies',tag:'render',type:'render video archive download',base:'https://archive.org/search?query={q}&and%5B%5D=mediatype%3A%22movies%22'},
+{name:'Internet Archive Audio',tag:'audio',type:'audio archive download',base:'https://archive.org/search?query={q}&and%5B%5D=mediatype%3A%22audio%22'},
+{name:'Wikimedia Commons Video',tag:'render',type:'render video image audio archive download',base:'https://commons.wikimedia.org/w/index.php?search={q}+filetype%3Avideo'},
+{name:'Wikimedia Commons Image',tag:'render',type:'render image archive download',base:'https://commons.wikimedia.org/w/index.php?search={q}+filetype%3Aimage'},
+{name:'Wikimedia Commons Audio',tag:'audio',type:'audio archive download',base:'https://commons.wikimedia.org/w/index.php?search={q}+filetype%3Aaudio'},
+{name:'Library of Congress Video',tag:'render',type:'render video image archive government download',base:'https://www.loc.gov/film-and-videos/?q={q}'},
+{name:'Library of Congress Photos',tag:'render',type:'image archive government download',base:'https://www.loc.gov/photos/?q={q}'},
+{name:'Library of Congress Audio',tag:'audio',type:'audio archive government download',base:'https://www.loc.gov/audio/?q={q}'},
+{name:'NASA Videos',tag:'render',type:'render video image science download',base:'https://images.nasa.gov/search-results?q={q}&media=video'},
+{name:'NASA Images',tag:'render',type:'image science download',base:'https://images.nasa.gov/search-results?q={q}&media=image'},
+{name:'National Archives Catalog',tag:'render',type:'render video image archive government download',base:'https://catalog.archives.gov/search?q={q}'},
+{name:'National Archives Videos',tag:'render',type:'render video archive government download',base:'https://catalog.archives.gov/search-within/559?availableOnline=true&q={q}'},
+{name:'DVIDS Video',tag:'render',type:'render video government military download',base:'https://www.dvidshub.net/search?q={q}&filter%5Btype%5D=video'},
+{name:'DVIDS Images',tag:'render',type:'image government military download',base:'https://www.dvidshub.net/search?q={q}&filter%5Btype%5D=image'},
+{name:'Pexels Videos',tag:'render',type:'render video stock download',base:'https://www.pexels.com/search/videos/{q}/'},
+{name:'Pexels Photos',tag:'render',type:'image stock download',base:'https://www.pexels.com/search/{q}/'},
+{name:'Pixabay Videos',tag:'render',type:'render video stock download',base:'https://pixabay.com/videos/search/{q}/'},
+{name:'Pixabay Images',tag:'render',type:'image stock download',base:'https://pixabay.com/images/search/{q}/'},
+{name:'Coverr',tag:'render',type:'render video stock download',base:'https://coverr.co/search?q={q}'},
+{name:'Mixkit Video',tag:'render',type:'render video stock download',base:'https://mixkit.co/free-stock-video/{q}/'},
+{name:'Videvo',tag:'render',type:'render video stock download',base:'https://www.videvo.net/search/{q}/'},
+{name:'Vidsplay',tag:'render',type:'render video stock download',base:'https://www.vidsplay.com/?s={q}'},
+{name:'Motion Places',tag:'render',type:'render video stock download',base:'https://www.motionplaces.com/?s={q}'},
+{name:'Life of Vids',tag:'render',type:'render video stock download',base:'https://www.lifeofvids.com/?s={q}'},
+{name:'Splitshire Video',tag:'render',type:'render video stock download',base:'https://www.splitshire.com/?s={q}'},
+{name:'Mazwai',tag:'render',type:'render video stock download',base:'https://mazwai.com/search/{q}'},
+{name:'Dareful',tag:'render',type:'render video stock download',base:'https://dareful.com/?s={q}'},
+{name:'Videezy',tag:'render',type:'render video stock reference',base:'https://www.videezy.com/free-video/{q}'},
+{name:'Flickr Commons',tag:'reference',type:'image archive reference',base:'https://www.flickr.com/search/?text={q}&license=4%2C5%2C6%2C9%2C10'},
+{name:'Flickr Search',tag:'reference',type:'image reference',base:'https://www.flickr.com/search/?text={q}'},
+{name:'Europeana',tag:'reference',type:'archive image video audio data',base:'https://www.europeana.eu/en/search?query={q}'},
+{name:'DPLA',tag:'reference',type:'archive image video audio data',base:'https://dp.la/search?q={q}'},
+{name:'Smithsonian Open Access',tag:'reference',type:'archive image museum data',base:'https://www.si.edu/search/collection-images?edan_q={q}'},
+{name:'DigitalNZ',tag:'reference',type:'archive image video audio data',base:'https://digitalnz.org/records?search%5Btext%5D={q}'},
+{name:'Trove Australia',tag:'reference',type:'archive image newspaper data',base:'https://trove.nla.gov.au/search?keyword={q}'},
+{name:'UK National Archives',tag:'reference',type:'archive government data image',base:'https://discovery.nationalarchives.gov.uk/results/r?_q={q}'},
+{name:'British Library Flickr',tag:'reference',type:'archive image download',base:'https://www.flickr.com/photos/britishlibrary/search/?text={q}'},
+{name:'Wellcome Collection',tag:'reference',type:'archive image science data',base:'https://wellcomecollection.org/search?query={q}'},
+{name:'Met Museum',tag:'data',type:'image museum data download',base:'https://www.metmuseum.org/art/collection/search?q={q}'},
+{name:'Art Institute Chicago',tag:'data',type:'image museum data download',base:'https://www.artic.edu/collection?query[term][title]={q}'},
+{name:'Cleveland Museum Art',tag:'data',type:'image museum data download',base:'https://www.clevelandart.org/art/collection/search?search={q}'},
+{name:'Harvard Art Museums',tag:'data',type:'image museum data',base:'https://harvardartmuseums.org/collections?q={q}'},
+{name:'Rijksmuseum',tag:'data',type:'image museum data download',base:'https://www.rijksmuseum.nl/en/search?q={q}'},
+{name:'Getty Collection',tag:'data',type:'image museum data reference',base:'https://www.getty.edu/art/collection/search?query={q}'},
+{name:'NYPL Digital Collections',tag:'reference',type:'archive image data download',base:'https://digitalcollections.nypl.org/search/index?keywords={q}'},
+{name:'Biodiversity Heritage Library',tag:'reference',type:'archive image data science',base:'https://www.biodiversitylibrary.org/search?searchTerm={q}'},
+{name:'USGS Multimedia',tag:'reference',type:'image video data science',base:'https://www.usgs.gov/media/images?keywords={q}'},
+{name:'NOAA Photo Library',tag:'reference',type:'image video data science',base:'https://photolib.noaa.gov/Search?searchText={q}'},
+{name:'NPS Media Search',tag:'data',type:'image data parks government',base:'https://www.nps.gov/search/?query={q}'},
+{name:'Data.gov',tag:'data',type:'data government',base:'https://catalog.data.gov/dataset/?q={q}'},
+{name:'Federal Register',tag:'data',type:'data government',base:'https://www.federalregister.gov/documents/search?conditions%5Bterm%5D={q}'},
+{name:'Congress.gov',tag:'data',type:'data government',base:'https://www.congress.gov/search?q={q}'},
+{name:'GovInfo',tag:'data',type:'data government archive',base:'https://www.govinfo.gov/app/search/%7B%22query%22%3A%22{q}%22%7D'},
+{name:'FBI Crime Data',tag:'data',type:'data crime government',base:'https://cde.ucr.cjis.gov/LATEST/webapp/#/pages/explorer/crime/crime-trend'},
+{name:'OpenFEMA',tag:'data',type:'data disaster government',base:'https://www.fema.gov/openfema-data-page/search?keys={q}'},
+{name:'World Bank',tag:'data',type:'data global',base:'https://data.worldbank.org/search?qterm={q}'},
+{name:'REST Countries',tag:'data',type:'data geography',base:'https://restcountries.com/v3.1/name/{q}'},
+{name:'OpenStreetMap',tag:'data',type:'data maps geography',base:'https://www.openstreetmap.org/search?query={q}'},
+{name:'GeoNames',tag:'data',type:'data maps geography',base:'https://www.geonames.org/search.html?q={q}'},
+{name:'GDELT',tag:'data',type:'data news reference',base:'https://www.gdeltproject.org/gdeltSearch/?query={q}&mode=artlist'},
+{name:'Wikipedia',tag:'data',type:'data facts reference',base:'https://en.wikipedia.org/w/index.php?search={q}'},
+{name:'Wikidata',tag:'data',type:'data facts reference',base:'https://www.wikidata.org/w/index.php?search={q}'},
+{name:'Wikinews',tag:'data',type:'data news reference',base:'https://en.wikinews.org/w/index.php?search={q}'},
+{name:'Open Library',tag:'data',type:'data books archive',base:'https://openlibrary.org/search?q={q}'},
+{name:'Crossref',tag:'data',type:'data papers science',base:'https://search.crossref.org/?q={q}'},
+{name:'Semantic Scholar',tag:'data',type:'data papers science',base:'https://www.semanticscholar.org/search?q={q}'},
+{name:'arXiv',tag:'data',type:'data papers science',base:'https://arxiv.org/search/?query={q}&searchtype=all'},
+{name:'Freesound',tag:'audio',type:'audio sound music download',base:'https://freesound.org/search/?q={q}'},
+{name:'Jamendo',tag:'audio',type:'audio music reference',base:'https://www.jamendo.com/search?qs=q%3D{q}'},
+{name:'Free Music Archive',tag:'audio',type:'audio music download',base:'https://freemusicarchive.org/search?quicksearch={q}'},
+{name:'Musopen',tag:'audio',type:'audio music download',base:'https://musopen.org/music/?search={q}'},
+{name:'ccMixter',tag:'audio',type:'audio music download',base:'https://ccmixter.org/search?search_text={q}'},
+{name:'YouTube Data Search',tag:'reference',type:'reference video',base:'https://www.youtube.com/results?search_query={q}'},
+{name:'Vimeo Search',tag:'reference',type:'reference video',base:'https://vimeo.com/search?q={q}'},
+{name:'TED Talks',tag:'reference',type:'reference video data',base:'https://www.ted.com/search?q={q}'},
+{name:'C-SPAN',tag:'reference',type:'reference video government news',base:'https://www.c-span.org/search/?searchtype=Videos&query={q}'},
+{name:'AP Archive',tag:'reference',type:'reference video news archive',base:'https://www.aparchive.com/search?query={q}'},
+{name:'British Pathé',tag:'reference',type:'reference video news archive',base:'https://www.britishpathe.com/search/query/{q}'},
+{name:'Reuters Pictures',tag:'reference',type:'reference image news',base:'https://pictures.reuters.com/search?query={q}'},
+{name:'Google Arts Culture',tag:'reference',type:'image museum reference',base:'https://artsandculture.google.com/search?q={q}'},
+{name:'MoMA Collection',tag:'reference',type:'image museum data',base:'https://www.moma.org/search?query={q}'},
+{name:'Brooklyn Museum',tag:'data',type:'image museum data',base:'https://www.brooklynmuseum.org/opencollection/search?keyword={q}'},
+{name:'Cooper Hewitt',tag:'data',type:'image museum data',base:'https://collection.cooperhewitt.org/search/collection?query={q}'},
+{name:'National Gallery Art',tag:'data',type:'image museum data download',base:'https://www.nga.gov/collection-search-result.html?searchTerm={q}'},
+{name:'Europeana Video',tag:'reference',type:'video archive data',base:'https://www.europeana.eu/en/search?query={q}&media=true'},
+{name:'Europeana Images',tag:'reference',type:'image archive data',base:'https://www.europeana.eu/en/search?query={q}&media=true'},
+{name:'Digital Commonwealth',tag:'reference',type:'archive image data',base:'https://www.digitalcommonwealth.org/search?search_field=all_fields&q={q}'},
+{name:'Calisphere',tag:'reference',type:'archive image data',base:'https://calisphere.org/search/?q={q}'},
+{name:'HathiTrust',tag:'data',type:'archive books data',base:'https://catalog.hathitrust.org/Search/Home?lookfor={q}&searchtype=all'},
+{name:'Project Gutenberg',tag:'data',type:'books archive data',base:'https://www.gutenberg.org/ebooks/search/?query={q}'},
+{name:'Chronicling America',tag:'data',type:'newspaper archive government',base:'https://chroniclingamerica.loc.gov/search/pages/results/?andtext={q}'},
+{name:'Newspapers SG',tag:'data',type:'newspaper archive',base:'https://eresources.nlb.gov.sg/newspapers/Search?keyword={q}'},
+{name:'Google Dataset Search',tag:'data',type:'data reference',base:'https://datasetsearch.research.google.com/search?query={q}'},
+{name:'Kaggle Datasets',tag:'data',type:'data reference',base:'https://www.kaggle.com/search?q={q}+in%3Adatasets'},
+{name:'Zenodo',tag:'data',type:'data papers science',base:'https://zenodo.org/search?q={q}'},
+{name:'Figshare',tag:'data',type:'data papers science',base:'https://figshare.com/search?q={q}'},
+{name:'OSF',tag:'data',type:'data papers science',base:'https://osf.io/search/?q={q}'},
+{name:'PubMed',tag:'data',type:'data papers science medical',base:'https://pubmed.ncbi.nlm.nih.gov/?term={q}'},
+{name:'ClinicalTrials',tag:'data',type:'data medical science',base:'https://clinicaltrials.gov/search?term={q}'},
+{name:'WHO Data',tag:'data',type:'data medical global',base:'https://www.who.int/search?query={q}'},
+{name:'CDC Data',tag:'data',type:'data medical government',base:'https://data.cdc.gov/browse?q={q}'},
+{name:'Our World in Data',tag:'data',type:'data global science',base:'https://ourworldindata.org/search?q={q}'},
+{name:'UN Data',tag:'data',type:'data global government',base:'https://data.un.org/Search.aspx?q={q}'},
+{name:'OECD Data',tag:'data',type:'data global',base:'https://data.oecd.org/searchresults/?q={q}'},
+{name:'Eurostat',tag:'data',type:'data global government',base:'https://ec.europa.eu/eurostat/databrowser/explore/all/all_themes?lang=en&display=list&sort=category&search={q}'},
+{name:'IMF Data',tag:'data',type:'data global',base:'https://www.imf.org/en/Search#q={q}'},
+{name:'NOAA Data',tag:'data',type:'data science weather',base:'https://www.ncei.noaa.gov/access/search/data-search/global-summary-of-the-day?search={q}'},
+{name:'NASA Data Portal',tag:'data',type:'data science space',base:'https://data.nasa.gov/browse?q={q}'},
+{name:'USGS Data',tag:'data',type:'data science government',base:'https://www.usgs.gov/search?keywords={q}'},
+{name:'Earthdata',tag:'data',type:'data science space',base:'https://search.earthdata.nasa.gov/search?q={q}'},
+{name:'OpenAQ',tag:'data',type:'data science weather',base:'https://explore.openaq.org/#/locations?_k={q}'},
+{name:'GBIF',tag:'data',type:'data science animal',base:'https://www.gbif.org/search?q={q}'},
+{name:'iNaturalist',tag:'reference',type:'image data animal science',base:'https://www.inaturalist.org/observations?place_id=any&q={q}'},
+{name:'eBird',tag:'data',type:'data animal science',base:'https://ebird.org/search?key={q}'},
+{name:'MarineTraffic',tag:'reference',type:'data maps ships',base:'https://www.marinetraffic.com/en/ais/index/search/all?keyword={q}'},
+{name:'AviationStack Reference',tag:'reference',type:'data maps planes',base:'https://www.flightradar24.com/data/airports/{q}'},
+{name:'OpenRailwayMap',tag:'reference',type:'data maps transport',base:'https://www.openrailwaymap.org/?lang=en&search={q}'},
+{name:'Wikiquote',tag:'data',type:'data quotes reference',base:'https://en.wikiquote.org/w/index.php?search={q}'},
+{name:'Quote Investigator',tag:'data',type:'data quotes reference',base:'https://quoteinvestigator.com/?s={q}'},
+{name:'Britannica',tag:'data',type:'data facts reference',base:'https://www.britannica.com/search?query={q}'},
+{name:'National Geographic',tag:'reference',type:'reference science image video',base:'https://www.nationalgeographic.com/search?q={q}'},
+{name:'Smithsonian Magazine',tag:'reference',type:'reference science history',base:'https://www.smithsonianmag.com/search/?q={q}'},
+{name:'History.com',tag:'reference',type:'reference history video',base:'https://www.history.com/search?q={q}'},
+{name:'BBC Archive Search',tag:'reference',type:'reference video news archive',base:'https://www.bbc.co.uk/search?q={q}'},
+{name:'PBS Search',tag:'reference',type:'reference video education',base:'https://www.pbs.org/search/?q={q}'},
+{name:'NPR Search',tag:'reference',type:'reference audio news',base:'https://www.npr.org/search?query={q}'},
+{name:'PRI Search',tag:'reference',type:'reference audio news',base:'https://theworld.org/search?search={q}'},
+{name:'Unsplash',tag:'reference',type:'image stock reference',base:'https://unsplash.com/s/photos/{q}'},
+{name:'StockSnap',tag:'reference',type:'image stock',base:'https://stocksnap.io/search/{q}'},
+{name:'Burst Shopify',tag:'reference',type:'image stock',base:'https://burst.shopify.com/photos/search?utf8=%E2%9C%93&q={q}'},
+{name:'LibreShot',tag:'reference',type:'image stock',base:'https://libreshot.com/?s={q}'},
+{name:'Rawpixel Public Domain',tag:'reference',type:'image stock archive',base:'https://www.rawpixel.com/search/{q}?sort=curated&page=1&path=_topics&topic=public-domain'},
+{name:'Public Domain Pictures',tag:'reference',type:'image stock archive',base:'https://www.publicdomainpictures.net/en/hledej.php?hleda={q}'},
+{name:'Picryl',tag:'reference',type:'image archive download',base:'https://picryl.com/search?q={q}'},
+{name:'World History Encyclopedia',tag:'reference',type:'image data history',base:'https://www.worldhistory.org/search/?q={q}'},
+{name:'Lumen Database',tag:'data',type:'data law reference',base:'https://lumendatabase.org/notices/search?term={q}'},
+{name:'CourtListener',tag:'data',type:'data law court',base:'https://www.courtlistener.com/?q={q}'},
+{name:'Oyez',tag:'data',type:'audio law court',base:'https://www.oyez.org/search/{q}'},
+{name:'Justia',tag:'data',type:'data law court',base:'https://law.justia.com/search?query={q}'},
+{name:'Google Patents',tag:'data',type:'data patents',base:'https://patents.google.com/?q={q}'},
+{name:'USPTO Search',tag:'data',type:'data patents government',base:'https://www.uspto.gov/search?search_api_fulltext={q}'},
+{name:'SEC EDGAR',tag:'data',type:'data business government',base:'https://www.sec.gov/edgar/search/#/q={q}'},
+{name:'OpenCorporates',tag:'data',type:'data business',base:'https://opencorporates.com/companies?q={q}'},
+{name:'Wikimedia Maps',tag:'reference',type:'data maps image',base:'https://commons.wikimedia.org/w/index.php?search={q}+map'},
+{name:'OpenTopoMap',tag:'reference',type:'data maps geography',base:'https://opentopomap.org/#map=5/40.000/-100.000'},
+{name:'Mapillary',tag:'reference',type:'image maps reference',base:'https://www.mapillary.com/app/?q={q}'},
+{name:'Openverse Audio',tag:'audio',type:'audio download',base:'https://openverse.org/search/audio?q={q}'},
+{name:'Openverse Images',tag:'render',type:'image download',base:'https://openverse.org/search/image?q={q}'},
+{name:'Google News Search',tag:'reference',type:'news reference',base:'https://news.google.com/search?q={q}'},
+{name:'Bing News Search',tag:'reference',type:'news reference',base:'https://www.bing.com/news/search?q={q}'},
+{name:'DuckDuckGo News',tag:'reference',type:'news reference',base:'https://duckduckgo.com/?q={q}&iar=news&ia=news'},
+{name:'MuckRock',tag:'data',type:'data government records',base:'https://www.muckrock.com/foi/list/?q={q}'},
+{name:'ProPublica Data Store',tag:'data',type:'data news government',base:'https://www.propublica.org/datastore/search?q={q}'},
+{name:'ICIJ Offshore Leaks',tag:'data',type:'data news business',base:'https://offshoreleaks.icij.org/search?q={q}'},
+{name:'Wayback Machine',tag:'reference',type:'archive web data',base:'https://web.archive.org/web/*/{q}'},
+{name:'Common Crawl Index',tag:'data',type:'data web archive',base:'https://index.commoncrawl.org/'},
+{name:'Perseus Digital Library',tag:'data',type:'books history archive',base:'https://www.perseus.tufts.edu/hopper/searchresults?q={q}'},
+{name:'JSTOR Daily',tag:'reference',type:'history science reference',base:'https://daily.jstor.org/?s={q}'},
+{name:'CORE Papers',tag:'data',type:'papers science',base:'https://core.ac.uk/search?q={q}'},
+{name:'DOAJ',tag:'data',type:'papers science',base:'https://doaj.org/search/articles?source=%7B%22query%22%3A%7B%22query_string%22%3A%7B%22query%22%3A%22{q}%22%7D%7D%7D'},
+{name:'OpenAlex',tag:'data',type:'papers science data',base:'https://openalex.org/works?page=1&filter=default.search:{q}'},
+{name:'NASA APOD',tag:'reference',type:'image science space',base:'https://apod.nasa.gov/cgi-bin/apod/apod_search?tquery={q}'},
+{name:'ESA Images',tag:'reference',type:'image video science space',base:'https://www.esa.int/esearch?q={q}'},
+{name:'ESO Images',tag:'reference',type:'image video science space',base:'https://www.eso.org/public/search/?q={q}'},
+{name:'CERN Document Server',tag:'data',type:'papers science video',base:'https://cds.cern.ch/search?ln=en&p={q}'},
+{name:'NOIRLab Images',tag:'reference',type:'image science space',base:'https://noirlab.edu/public/images/?search={q}'},
+{name:'Hubble Site',tag:'reference',type:'image science space',base:'https://hubblesite.org/search?query={q}'},
+{name:'Webb Telescope',tag:'reference',type:'image science space',base:'https://webbtelescope.org/search?searchQuery={q}'},
+{name:'Volcano Discovery',tag:'reference',type:'image science disaster',base:'https://www.volcanodiscovery.com/search.html?q={q}'},
+{name:'EMSC Earthquakes',tag:'data',type:'data science disaster',base:'https://www.emsc-csem.org/Earthquake/?filter=yes'},
+{name:'US Tornado Archive',tag:'data',type:'data weather disaster',base:'https://tornadoarchive.com/home/'},
+{name:'National Hurricane Center',tag:'data',type:'data weather disaster',base:'https://www.nhc.noaa.gov/search.php?q={q}'},
+{name:'Global Volcanism Program',tag:'data',type:'data science disaster',base:'https://volcano.si.edu/search_volcano.cfm'},
+{name:'IFRC Disaster Data',tag:'data',type:'data disaster global',base:'https://go.ifrc.org/'},
+{name:'ReliefWeb',tag:'data',type:'data disaster news',base:'https://reliefweb.int/search/results?search={q}'},
+{name:'Google Scholar',tag:'data',type:'papers reference',base:'https://scholar.google.com/scholar?q={q}'},
+{name:'BASE Search',tag:'data',type:'papers data',base:'https://www.base-search.net/Search/Results?lookfor={q}'},
+{name:'Dimensions Search',tag:'data',type:'papers data',base:'https://app.dimensions.ai/discover/publication?search_text={q}'},
+{name:'Lens Scholarly',tag:'data',type:'papers patents data',base:'https://www.lens.org/lens/search/scholar/list?q={q}'},
+{name:'OpenReview',tag:'data',type:'papers science data',base:'https://openreview.net/search?term={q}'},
+{name:'Papers With Code',tag:'data',type:'papers tech data',base:'https://paperswithcode.com/search?q={q}'},
+{name:'Hugging Face Models',tag:'data',type:'data tech ai',base:'https://huggingface.co/models?search={q}'},
+{name:'Hugging Face Datasets',tag:'data',type:'data tech ai',base:'https://huggingface.co/datasets?search={q}'},
+{name:'GitHub Search',tag:'data',type:'data code tech',base:'https://github.com/search?q={q}&type=repositories'},
+{name:'GitLab Search',tag:'data',type:'data code tech',base:'https://gitlab.com/search?search={q}'},
+{name:'npm Search',tag:'data',type:'data code tech',base:'https://www.npmjs.com/search?q={q}'},
+{name:'PyPI Search',tag:'data',type:'data code tech',base:'https://pypi.org/search/?q={q}'},
+{name:'Stack Exchange',tag:'data',type:'data reference tech',base:'https://stackexchange.com/search?q={q}'},
+{name:'MDN Search',tag:'data',type:'data tech reference',base:'https://developer.mozilla.org/en-US/search?q={q}'},
+{name:'Can I Use',tag:'data',type:'data tech web',base:'https://caniuse.com/?search={q}'},
+{name:'W3C Search',tag:'data',type:'data tech web',base:'https://www.w3.org/Search/Mail/Public/search?type-index=www&q={q}'},
+{name:'Google Trends',tag:'data',type:'data trends',base:'https://trends.google.com/trends/explore?q={q}'},
+{name:'Exploding Topics',tag:'reference',type:'data trends',base:'https://explodingtopics.com/search?q={q}'},
+{name:'Reddit Search',tag:'reference',type:'reference social',base:'https://www.reddit.com/search/?q={q}'},
+{name:'Mastodon Search',tag:'reference',type:'reference social',base:'https://mastodon.social/tags/{q}'},
+{name:'Internet Archive TV News',tag:'reference',type:'video news archive',base:'https://archive.org/details/tv?q={q}'},
+{name:'TV News Archive Captions',tag:'reference',type:'video news archive',base:'https://archive.org/details/tv?q={q}&sin='}
+];
+const modes=[
+{label:'Video exact',suffix:' video',mode:'video',boost:'render'},
+{label:'Short clip',suffix:' short clip',mode:'video',boost:'render'},
+{label:'Download',suffix:' download',mode:'download',boost:'render'},
+{label:'Public domain',suffix:' public domain',mode:'download',boost:'render'},
+{label:'Creative Commons',suffix:' creative commons',mode:'download',boost:'render'},
+{label:'Archive',suffix:' archive footage',mode:'video',boost:'reference'},
+{label:'Interview',suffix:' interview',mode:'video',boost:'reference'},
+{label:'Event',suffix:' public event',mode:'video',boost:'reference'},
+{label:'Speech',suffix:' speech',mode:'audio',boost:'reference'},
+{label:'Red carpet',suffix:' red carpet',mode:'video',boost:'reference'},
+{label:'Award show',suffix:' award show',mode:'video',boost:'reference'},
+{label:'News',suffix:' news footage',mode:'facts',boost:'reference'},
+{label:'Fact',suffix:' facts',mode:'facts',boost:'data'},
+{label:'Timeline',suffix:' timeline',mode:'facts',boost:'data'},
+{label:'Photo',suffix:' photo',mode:'image',boost:'reference'},
+{label:'Image',suffix:' image',mode:'image',boost:'reference'},
+{label:'Audio',suffix:' audio',mode:'audio',boost:'audio'},
+{label:'Music',suffix:' music',mode:'audio',boost:'audio'},
+{label:'Sound effect',suffix:' sound effect',mode:'audio',boost:'audio'},
+{label:'Dataset',suffix:' dataset',mode:'facts',boost:'data'},
+{label:'Map',suffix:' map',mode:'facts',boost:'data'},
+{label:'Court',suffix:' court records',mode:'facts',boost:'data'},
+{label:'Government',suffix:' government records',mode:'facts',boost:'data'},
+{label:'Disaster',suffix:' disaster footage',mode:'video',boost:'render'},
+{label:'Science',suffix:' science footage',mode:'video',boost:'render'},
+{label:'Background',suffix:' background footage',mode:'video',boost:'render'},
+{label:'B-roll',suffix:' b roll',mode:'video',boost:'render'},
+{label:'Vertical',suffix:' vertical video',mode:'video',boost:'render'},
+{label:'HD',suffix:' hd video',mode:'video',boost:'render'},
+{label:'Official',suffix:' official',mode:'facts',boost:'reference'}
+];
+function clean(v){return String(v||'').trim().replace(/\s+/g,' ')}
+function enc(v){return encodeURIComponent(clean(v))}
+function read(){try{return JSON.parse(localStorage.getItem(STORE)||'{}')}catch(e){return{}}}
+function write(st){localStorage.setItem(STORE,JSON.stringify(st))}
+function toast(m){const t=document.querySelector('#toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+function query(){return clean(document.querySelector('#q').value)||clean(read().subject)||'history'}
+function makeRoutes(){
+  const q=query();
+  const routes=[];
+  for(const src of baseSources){
+    for(const m of modes){
+      const full=clean(q+' '+m.suffix);
+      const url=src.base.replaceAll('{q}',enc(full));
+      const tag=src.tag==='render'||m.boost==='render'?'render':src.tag==='audio'||m.boost==='audio'?'audio':src.tag==='data'||m.boost==='data'?'data':'reference';
+      routes.push({name:src.name+' · '+m.label,base:src.name,mode:m.mode,tag,type:src.type+' '+m.mode+' '+tag,url,about:src.name+' search route for '+m.label.toLowerCase()+'.'});
+    }
+  }
+  return routes;
+}
+let visible=[];
+function render(){
+  const grid=document.querySelector('#grid'),kind=document.querySelector('#kind').value,mode=document.querySelector('#mode').value;
+  const routes=makeRoutes();
+  visible=routes.filter(r=>(kind==='all'||r.type.includes(kind)||r.tag===kind)&&(mode==='all'||r.mode===mode||r.type.includes(mode)));
+  grid.innerHTML='';
+  visible.slice(0,650).forEach(r=>{
+    const card=document.createElement('article');
+    card.className='source';
+    card.innerHTML='<span class="tag '+(r.tag==='render'?'render':r.tag==='data'?'data':r.tag==='audio'?'audio':'ref')+'">'+r.tag+'</span><h3>'+r.name+'</h3><p>'+r.about+'</p><div class="links"><a href="'+r.url+'" target="_blank">Search</a><button type="button" data-name="'+r.name+'">Use</button></div>';
+    grid.appendChild(card);
+  });
+  document.querySelector('#status').textContent=routes.length.toLocaleString()+' source routes generated. '+visible.length.toLocaleString()+' visible. Query: '+query();
+}
+document.querySelector('#saveQuery').onclick=()=>{const st=read();st.subject=query();st.extraSources=baseSources.map(s=>s.name);st.sourceRouteCount=makeRoutes().length;write(st);toast('Saved query and 500 plus source routes for the app.')}
+document.querySelector('#openTop').onclick=()=>{const top=visible.filter(r=>r.tag==='render').slice(0,10);top.forEach((r,i)=>setTimeout(()=>window.open(r.url,'_blank'),i*160));toast('Opening top render routes.')}
+document.querySelector('#copyList').onclick=async()=>{const names=visible.map(r=>r.name).join('\n');try{await navigator.clipboard.writeText(names);toast('Copied visible route names.')}catch(e){toast('Copy blocked by browser.')}}
+document.querySelector('#kind').onchange=render;document.querySelector('#mode').onchange=render;document.querySelector('#q').oninput=render;document.addEventListener('click',e=>{const b=e.target.closest('[data-name]');if(!b)return;const st=read();st.subject=query();st.preferredSourceRoute=b.dataset.name;write(st);toast('Saved '+b.dataset.name+'.')});document.querySelector('#q').value=clean(read().subject)||'';render();
+</script>
+</body>
+</html>
