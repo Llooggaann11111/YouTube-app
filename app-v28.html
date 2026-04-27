@@ -19,7 +19,7 @@ body{margin:0;background:radial-gradient(circle at top left,#0b2b10,#050609 36%)
   <div class="brand"><div class="logo">F</div><div><p>locked v28 studio</p><h1>FactPulse v28</h1></div></div>
   <a class="pill" href="create-v21.html?v=28">Create</a>
 </header>
-<div class="notice">This is the locked v28 hub. Everything stays inside v28. The clip and render engines are the working v25 engines, wrapped and locked here as v28.</div>
+<div class="notice">This is the locked v28 hub. Everything stays inside v28. Older working engines are rebranded inside this hub so the app no longer looks mixed.</div>
 <div class="tabs">
   <button class="active" id="showAll" type="button">All</button>
   <button id="showClips" type="button">Clips</button>
@@ -78,5 +78,6 @@ $('#mobileCore').onclick=()=>setView('core');
 window.addEventListener('resize',()=>setView(window.innerWidth<=1120?'clips':'all'));
 setView(window.innerWidth<=1120?'clips':'all');
 </script>
+<script src="v28-frame-fix.js?v=2"></script>
 </body>
 </html>
