@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>FactPulse v32</title>
+<style>
+html,body{margin:0;height:100%;background:#060809;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Arial,sans-serif;color:white}
+iframe{position:fixed;inset:0;width:100%;height:100dvh;border:0;background:#060809}
+#toast{position:fixed;left:18px;right:18px;bottom:26px;background:#040705;border:1px solid rgba(44,255,84,.45);border-radius:18px;color:#2cff54;padding:14px;text-align:center;font-weight:900;z-index:50;opacity:0;transform:translateY(8px);transition:.2s}
+#toast.show{opacity:1;transform:translateY(0)}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.92);display:none;place-items:center;padding:18px;z-index:100}
+#modal.show{display:grid}
+.modal-card{width:min(100%,450px);background:#090d12;border:1px solid rgba(255,255,255,.12);border-radius:26px;padding:14px}
+.close{width:100%;border:0;border-radius:18px;background:linear-gradient(180deg,#63ff59,#27ee47);color:#061006;font-size:20px;font-weight:1000;padding:18px;margin-bottom:12px}
+.media{width:100%;aspect-ratio:9/16;background:#000;border-radius:22px;overflow:hidden;position:relative}
+.media iframe,.media video,.media img{width:100%;height:100%;border:0;object-fit:cover;background:#000}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;padding:20px;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,.58),rgba(0,0,0,.08) 30%,rgba(0,0,0,.12) 70%,rgba(0,0,0,.58))}
+.ov-title{color:#2cff54;font-weight:1000;font-size:20px;text-align:center;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+.ov-cap{align-self:center;width:86%;padding:16px;border:3px solid #2cff54;background:rgba(7,15,22,.75);text-align:center;color:#2cff54;font-weight:1000;font-size:17px;line-height:1.2;text-shadow:0 2px 8px rgba(0,0,0,.7)}
+.ov-foot{display:flex;flex-direction:column;align-items:center;gap:10px}.ov-bar{width:74%;height:8px;border-radius:999px;background:rgba(255,255,255,.18);overflow:hidden}.ov-bar span{display:block;height:100%;width:0;background:#2cff54}.ov-tag{font-size:15px;font-weight:900}
+#msg{color:#a3acb7;font-weight:800;line-height:1.35;margin:12px 4px 0;white-space:pre-wrap}
+</style>
+</head>
+<body>
+<iframe id="app" src="app-v31.html?wrap=v32"></iframe>
+<div id="toast">Ready</div>
+<div id="modal"><div class="modal-card"><button class="close" id="close">Close</button><div class="media" id="media"></div><div id="msg"></div></div></div>
+<script>
+const frame=document.getElementById('app');
+const modal=document.getElementById('modal');
+const media=document.getElementById('media');
+const msg=document.getElementById('msg');
+function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2300)}
+function clean(v){return String(v||'').trim().replace(/\s+/g,' ')}
+function esc(v){return String(v||'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function readState(){try{return JSON.parse(localStorage.getItem('factpulse-v31-clean')||'{}')}catch(e){return{}}}
+function firstClip(){const s=readState();return (s.timeline&&s.timeline[0])||(s.clips&&s.clips[0])||null}
+function overlayHtml(){const s=readState();const title=esc(clean(s.subject)||'FactPulse v32');const cap=esc(clean(s.caption)||((firstClip()&&firstClip().title)||'Preview render'));return '<div class="overlay"><div class="ov-title">'+title+'</div><div class="ov-cap">'+cap+'</div><div class="ov-foot"><div class="ov-bar"><span id="bar"></span></div><div class="ov-tag">Preview render</div></div></div>'}
+function showClip(c, renderMode){modal.classList.add('show');msg.textContent='';media.innerHTML='';if(!c){media.innerHTML='<div style="height:100%;display:grid;place-items:center;text-align:center;padding:20px"><h2>Add a clip first</h2></div>';return}
+ let base='';
+ if(c.embed&&c.embedUrl){base='<iframe src="'+esc(c.embedUrl.replace('https://www.youtube.com/embed/','https://www.youtube.com/embed/'))+'?playsinline=1&autoplay=1&mute=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>'}
+ else if(c.url){base='<video id="vid" controls playsinline autoplay muted loop src="'+esc(c.url)+'"></video>'}
+ else if(c.thumb){base='<img src="'+esc(c.thumb)+'" alt="preview">'}
+ else if(c.page){base='<div style="height:100%;display:grid;place-items:center;text-align:center;padding:20px"><div><h2>'+esc(c.title)+'</h2><p style="color:#a3acb7">Open the source page for this result.</p><a style="color:#2cff54;font-weight:900" href="'+esc(c.page)+'" target="_blank">Open source</a></div></div>'}
+ else{base='<div style="height:100%;display:grid;place-items:center;text-align:center;padding:20px"><h2>No preview media</h2></div>'}
+ media.innerHTML=base+(renderMode?overlayHtml():'');
+ const v=document.getElementById('vid'); if(v){v.play().catch(()=>{})}
+ if(renderMode){let p=0;clearInterval(window.__fp32);window.__fp32=setInterval(()=>{p=(p+2)%101;const b=document.getElementById('bar');if(b)b.style.width=p+'%'},120);msg.textContent=c.embed?'This is the real YouTube preview with overlay. YouTube stays preview-only for export.':'This is the real selected clip with overlay.'}
+}
+function patch(){let d;try{d=frame.contentDocument}catch(e){return}if(!d||!d.body)return;
+ if(d.getElementById('v32style'))return;
+ const st=d.createElement('style');st.id='v32style';st.textContent='.status{display:none!important}.app{padding-top:calc(env(safe-area-inset-top,0px) + 16px)!important}.hero h4{color:#2cff54!important}.hero h4::after{content:"  V32"}.hero h2{font-size:22px!important}.hero p{font-size:14px!important}#render .section:first-child .grid2{grid-template-columns:1fr!important}.tab{padding-top:20px!important;padding-bottom:20px!important}.bottom{padding-bottom:env(safe-area-inset-bottom,0px)!important}';d.head.appendChild(st);
+ const fmt=d.getElementById('formatText');const ex=d.getElementById('exportBtn');const clip=firstClip();if(fmt&&clip&&clip.embed)fmt.textContent='Ref';if(ex&&clip&&clip.embed){ex.querySelector('.stack')&&(ex.querySelector('.stack').innerHTML='Preview Only<small>YouTube reference</small>')}
+ const renderBtn=d.getElementById('renderBtn');if(renderBtn){renderBtn.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();showClip(firstClip(),true);toast('Showing real clip preview')},true)}
+ const previewAll=d.getElementById('previewAll');if(previewAll){previewAll.addEventListener('click',e=>{e.preventDefault();e.stopImmediatePropagation();showClip((readState().clips||[])[0],false)},true)}
+ const exportBtn=d.getElementById('exportBtn');if(exportBtn){exportBtn.addEventListener('click',e=>{const c=firstClip();if(c&&c.embed){e.preventDefault();e.stopImmediatePropagation();showClip(c,true);toast('YouTube is preview-only. Use Pixabay or Wikimedia to export.')};},true)}
+ toast('v32 fixes loaded')
+}
+frame.addEventListener('load',()=>{setTimeout(patch,250);setInterval(patch,1300)});
+document.getElementById('close').onclick=()=>{modal.classList.remove('show');media.innerHTML='';msg.textContent='';clearInterval(window.__fp32)};
+</script>
+</body>
+</html>
